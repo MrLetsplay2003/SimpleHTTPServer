@@ -1,0 +1,42 @@
+package me.mrletsplay.simplehttpserver.http;
+
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
+
+import me.mrletsplay.simplehttpserver.server.connection.Connection;
+import me.mrletsplay.simplehttpserver.server.connection.ConnectionAcceptor;
+
+public class HttpConnectionAcceptor implements ConnectionAcceptor {
+
+	private HttpServer server;
+	private List<HttpConnection> connections;
+	
+	public HttpConnectionAcceptor(HttpServer server) {
+		this.server = server;
+		this.connections = new ArrayList<>();
+	}
+	
+	@Override
+	public HttpConnection createConnection(Socket socket) {
+		return new HttpConnection(server, socket);
+	}
+
+	@Override
+	public void accept(Connection connection) {
+		HttpConnection con = (HttpConnection) connection;
+		connections.add(con);
+		con.startRecieving();
+	}
+
+	@Override
+	public List<HttpConnection> getActiveConnections() {
+		return connections;
+	}
+
+	@Override
+	public HttpServer getServer() {
+		return server;
+	}
+
+}
