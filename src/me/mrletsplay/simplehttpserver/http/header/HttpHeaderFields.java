@@ -2,6 +2,7 @@ package me.mrletsplay.simplehttpserver.http.header;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,7 @@ public class HttpHeaderFields {
 	}
 
 	public void add(String name, String value) {
-		List<String> vs = getAll(name.toLowerCase());
+		List<String> vs = fields.getOrDefault(name.toLowerCase(), new ArrayList<>());
 		vs.add(value);
 		fields.put(name.toLowerCase(), vs);
 	}
@@ -31,7 +32,7 @@ public class HttpHeaderFields {
 	}
 
 	public List<String> getAll(String name) {
-		return fields.getOrDefault(name.toLowerCase(), new ArrayList<>());
+		return fields.getOrDefault(name.toLowerCase(), Collections.emptyList());
 	}
 
 	public String getFirst(String name) {
