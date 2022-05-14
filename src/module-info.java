@@ -20,7 +20,7 @@ module simplehttpserver {
 	exports me.mrletsplay.simplehttpserver.http.request.form;
 	exports me.mrletsplay.simplehttpserver.dom.css;
 
-	requires transitive mrcore;
+	requires transitive me.mrletsplay.mrcore;
 	requires transitive org.slf4j;
 
 	requires org.apache.commons.text;

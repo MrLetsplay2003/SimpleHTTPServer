@@ -9,7 +9,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 import me.mrletsplay.mrcore.io.IOUtils;
@@ -112,7 +111,7 @@ public class PHPFileDocument implements HttpDocument {
 			}
 			c.getServerHeader().setContent(fallbackMimeType, postData, false);
 		} catch (IOException e) {
-			PHP.getLogger().log(Level.FINE, "Error while running PHP-CGI", e);
+			PHP.getLogger().debug("Error while running PHP-CGI", e);
 		}
 	}
 
