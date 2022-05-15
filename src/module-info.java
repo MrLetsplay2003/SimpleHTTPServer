@@ -5,7 +5,6 @@ module simplehttpserver {
 	exports me.mrletsplay.simplehttpserver.http.header;
 	exports me.mrletsplay.simplehttpserver.server.impl;
 	exports me.mrletsplay.simplehttpserver.dom.html.element;
-	exports me.mrletsplay.simplehttpserver._test;
 	exports me.mrletsplay.simplehttpserver.http.request.urlencoded;
 	exports me.mrletsplay.simplehttpserver.http.websocket;
 	exports me.mrletsplay.simplehttpserver.php;
