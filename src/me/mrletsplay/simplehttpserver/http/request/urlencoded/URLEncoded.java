@@ -47,14 +47,13 @@ public class URLEncoded {
 		return data.getOrDefault(key, Collections.emptyList());
 	}
 
-	public String getFirst(String key) {
-		List<String> d = data.get(key);
-		return d == null ? null : d.get(0);
-	}
-
 	public String getFirst(String key, String fallback) {
 		List<String> d = data.get(key);
-		return d == null ? null : d.get(0);
+		return d == null ? fallback : d.get(0);
+	}
+
+	public String getFirst(String key) {
+		return getFirst(key, null);
 	}
 
 	@Override
