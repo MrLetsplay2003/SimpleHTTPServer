@@ -23,10 +23,6 @@ public interface Connection {
 		}
 	}
 
-	public default void isClosed() {
-
-	}
-
 	public default boolean isSocketAlive() {
 		return !getSocket().isClosed() && getSocket().isConnected() && getSocket().isBound() && !getSocket().isInputShutdown() && !getSocket().isOutputShutdown();
 	}
