@@ -139,7 +139,7 @@ public class HttpConnection extends AbstractConnection {
 
 		sOut.flush();
 
-		return h.getFields().getFirst("Connection").equalsIgnoreCase("keep-alive");
+		return h.getFields().getFirst("Connection").equalsIgnoreCase("keep-alive") || websocketConnection != null;
 	}
 
 	private void applyRanges(HttpServerHeader sh) {
