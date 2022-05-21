@@ -19,8 +19,8 @@ public class PathMatcher {
 	 * <li>Variable parameters may only be used in the last path segment</li>
 	 * </ul>
 	 * <br>
-	 * Example inputs and outputs:
 	 * <table>
+	 * <caption>Example inputs and outputs:</caption>
 	 * <tr><th>Pattern</th><th>Path</th><th>Output</th>
 	 * <tr><td>/path/{parameter1}/more/{parameter2}</td><td>/path/one/more/two</td><td>{parameter1=one, parameter2=two}</td></tr>
 	 * <tr><td>/path/{parameter1}/more/{parameter2...}</td><td>/path/one/more/two/three</td><td>{parameter1=one, parameter2=two/three}</td></tr>
