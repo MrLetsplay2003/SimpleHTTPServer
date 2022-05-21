@@ -16,6 +16,7 @@ public class HttpRequestContext {
 	private HttpConnection connection;
 	private HttpClientHeader clientHeader;
 	private HttpServerHeader serverHeader;
+	private Map<String, String> pathParameters;
 	private Map<String, Object> properties;
 	private Exception exception;
 
@@ -48,6 +49,14 @@ public class HttpRequestContext {
 
 	public HttpServerHeader getServerHeader() {
 		return serverHeader;
+	}
+
+	public void setPathParameters(Map<String, String> pathParameters) {
+		this.pathParameters = pathParameters;
+	}
+
+	public Map<String, String> getPathParameters() {
+		return pathParameters;
 	}
 
 	public void setProperty(String name, Object value) {

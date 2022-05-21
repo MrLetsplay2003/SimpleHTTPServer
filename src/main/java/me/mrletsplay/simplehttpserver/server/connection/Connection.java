@@ -7,21 +7,26 @@ import me.mrletsplay.simplehttpserver.server.Server;
 import me.mrletsplay.simplehttpserver.server.ServerException;
 
 public interface Connection {
-	
+
 	public void startRecieving();
-	
+
 	public Server getServer();
-	
+
 	public Socket getSocket();
-	
+
 	public default void close() {
 		try {
 			getSocket().close();
+			getServer().getConnectionAcceptor().remove(this);
 		} catch (IOException e) {
 			throw new ServerException("Error while closing the connection", e);
 		}
 	}
-	
+
+	public default void isClosed() {
+
+	}
+
 	public default boolean isSocketAlive() {
 		return !getSocket().isClosed() && getSocket().isConnected() && getSocket().isBound() && !getSocket().isInputShutdown() && !getSocket().isOutputShutdown();
 	}

@@ -120,12 +120,12 @@ public abstract class AbstractServer implements Server {
 	public void shutdown() {
 		try {
 			executor.shutdown();
+			acceptor.closeAllConnections();
 			try {
 				if(!executor.awaitTermination(5L, TimeUnit.SECONDS)) executor.shutdownNow();
 			}catch(InterruptedException e) {
 				throw new ServerException("Error while stopping executor", e);
 			}
-			acceptor.closeAllConnections();
 			if(socket != null) socket.close();
 		} catch (IOException e) {
 			throw new ServerException("Error while stopping server", e);

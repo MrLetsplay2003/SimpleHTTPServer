@@ -29,7 +29,7 @@ import me.mrletsplay.simplehttpserver.server.ServerException;
 import me.mrletsplay.simplehttpserver.server.connection.AbstractConnection;
 
 public class HttpConnection extends AbstractConnection {
-	
+
 	private WebSocketConnection websocketConnection;
 
 	public HttpConnection(HttpServer server, Socket socket) {
@@ -40,11 +40,11 @@ public class HttpConnection extends AbstractConnection {
 			getServer().getLogger().debug("Error while intializing connection", e);
 		}
 	}
-	
+
 	public boolean isSecure() {
 		return getSocket() instanceof SSLSocket;
 	}
-	
+
 	@Override
 	public void startRecieving() {
 		getServer().getExecutor().submit(() -> {
@@ -57,6 +57,7 @@ public class HttpConnection extends AbstractConnection {
 				}catch(SocketTimeoutException ignored) {
 				}catch(SocketException ignored) {
 					// Client probably just disconnected
+					close();
 				}catch(Exception e) {
 					close();
 					getServer().getLogger().debug("Error in client receive loop", e);
@@ -65,41 +66,41 @@ public class HttpConnection extends AbstractConnection {
 			}
 		});
 	}
-	
+
 	@Override
 	public HttpServer getServer() {
 		return (HttpServer) super.getServer();
 	}
-	
+
 	public void setWebsocketConnection(WebSocketConnection websocketConnection) {
 		this.websocketConnection = websocketConnection;
 	}
-	
+
 	public WebSocketConnection getWebsocketConnection() {
 		return websocketConnection;
 	}
-	
+
 	private boolean receive() throws IOException {
 		if(websocketConnection != null) {
 			websocketConnection.receive();
 			return true;
 		}
-		
+
 		HttpClientHeader h = HttpClientHeader.parse(getSocket().getInputStream());
 		if(h == null) return false;
-		
+
 		HttpServerHeader sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
 		HttpRequestContext ctx = new HttpRequestContext(this, h, sh);
 		HttpRequestContext.setCurrentContext(ctx);
-		
+
 		HttpDocument d = getServer().getDocumentProvider().getDocument(h.getPath().getDocumentPath());
 		if(d == null) d = getServer().getDocumentProvider().get404Document();
-		
+
 		try {
 			d.createContent();
-			
+
 			sh = ctx.getServerHeader();
-			
+
 			if(sh.isAllowByteRanges()) applyRanges(sh);
 			if(sh.isCompressionEnabled()) applyCompression(sh);
 		}catch(Exception e) {
@@ -110,24 +111,24 @@ public class HttpConnection extends AbstractConnection {
 			ctx = new HttpRequestContext(this, h, sh);
 			HttpRequestContext.setCurrentContext(ctx);
 			ctx.setException(e);
-			
+
 			getServer().getDocumentProvider().get500Document().createContent();
 		}
-		
+
 		if("keep-alive".equalsIgnoreCase(h.getFields().getFirst("Connection"))) {
 			sh.getFields().set("Connection", "keep-alive");
 		}
-		
+
 		InputStream sIn = getSocket().getInputStream();
 		OutputStream sOut = getSocket().getOutputStream();
-		
+
 		sOut.write(sh.getHeaderBytes());
 		sOut.flush();
-		
+
 		InputStream in = sh.getContent();
 		long skipped = in.skip(sh.getContentOffset());
 		if(skipped < sh.getContentOffset()) getServer().getLogger().debug("Could not skip to content offset (skipped " + skipped + " of " + sh.getContentOffset() + " bytes)");
-		
+
 		byte[] buf = new byte[4096];
 		int len;
 		int tot = 0;
@@ -135,15 +136,15 @@ public class HttpConnection extends AbstractConnection {
 			tot += len;
 			sOut.write(buf, 0, len);
 		}
-		
+
 		sOut.flush();
-		
-		return !h.getFields().getFirst("Connection").equalsIgnoreCase("close");
+
+		return h.getFields().getFirst("Connection").equalsIgnoreCase("keep-alive");
 	}
-	
+
 	private void applyRanges(HttpServerHeader sh) {
 		HttpRequestContext ctx = HttpRequestContext.getCurrentContext();
-		
+
 		Pattern byteRangePattern = Pattern.compile("bytes=(?<start>\\d+)?-(?<end>\\d+)?"); // Multipart range requests are not supported
 		String range = ctx.getClientHeader().getFields().getFirst("Range");
 		if(range != null) {
@@ -181,12 +182,12 @@ public class HttpConnection extends AbstractConnection {
 			}
 		}
 	}
-	
+
 	private void applyCompression(HttpServerHeader sh) throws IOException {
 		HttpRequestContext ctx = HttpRequestContext.getCurrentContext();
-		
+
 		if(ctx.getClientHeader().getFields().getFirst("Accept-Encoding") == null) return;
-		
+
 		List<String> supCs = Arrays.stream(ctx.getClientHeader().getFields().getFirst("Accept-Encoding").split(","))
 				.map(String::trim)
 				.collect(Collectors.toList());
@@ -196,15 +197,15 @@ public class HttpConnection extends AbstractConnection {
 		if(comp != null) {
 			InputStream content = sh.getContent();
 			sh.getFields().set("Content-Encoding", comp.getName());
-			
+
 			byte[] uncompressedContent = IOUtils.readAllBytes(content);
 			sh.setContent(comp.compress(uncompressedContent));
 		}
 	}
-	
+
 	@Override
 	public void close() {
-		if(websocketConnection != null) websocketConnection.sendCloseFrame(CloseFrame.GOING_AWAY, "Server shutting down");
+		if(websocketConnection != null && isSocketAlive()) websocketConnection.sendCloseFrame(CloseFrame.GOING_AWAY, "Server shutting down");
 		super.close();
 	}
 

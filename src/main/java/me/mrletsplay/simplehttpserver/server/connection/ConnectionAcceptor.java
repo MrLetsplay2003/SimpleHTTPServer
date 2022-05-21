@@ -7,15 +7,17 @@ import me.mrletsplay.simplehttpserver.server.Server;
 import me.mrletsplay.simplehttpserver.server.ServerException;
 
 public interface ConnectionAcceptor {
-	
+
 	public Connection createConnection(Socket socket);
 
 	public void accept(Connection connection);
-	
+
+	public void remove(Connection connection);
+
 	public Collection<? extends Connection> getActiveConnections();
-	
+
 	public Server getServer();
-	
+
 	public default void closeAllConnections() {
 		for(Connection c : getActiveConnections()) {
 			try {
@@ -25,5 +27,5 @@ public interface ConnectionAcceptor {
 			}
 		}
 	}
-	
+
 }

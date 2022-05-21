@@ -11,12 +11,12 @@ public class HttpConnectionAcceptor implements ConnectionAcceptor {
 
 	private HttpServer server;
 	private List<HttpConnection> connections;
-	
+
 	public HttpConnectionAcceptor(HttpServer server) {
 		this.server = server;
 		this.connections = new ArrayList<>();
 	}
-	
+
 	@Override
 	public HttpConnection createConnection(Socket socket) {
 		return new HttpConnection(server, socket);
@@ -27,6 +27,11 @@ public class HttpConnectionAcceptor implements ConnectionAcceptor {
 		HttpConnection con = (HttpConnection) connection;
 		connections.add(con);
 		con.startRecieving();
+	}
+
+	@Override
+	public void remove(Connection connection) {
+		connections.remove(connection);
 	}
 
 	@Override
