@@ -23,7 +23,7 @@ public interface ConnectionAcceptor {
 			try {
 				c.close();
 			} catch(ServerException e) {
-				getServer().getLogger().debug("Error while closing connection", e);
+				getServer().getLogger().error("Error while closing connection", e);
 			}
 		}
 	}

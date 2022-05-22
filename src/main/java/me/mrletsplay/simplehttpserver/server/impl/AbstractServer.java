@@ -44,7 +44,7 @@ public abstract class AbstractServer implements Server {
 						acceptConnection();
 					}catch(SocketTimeoutException ignored) {
 					}catch(Exception e) {
-						getLogger().debug("Error while accepting connection", e);
+						getLogger().error("Error while accepting connection", e);
 					}
 				}
 			});

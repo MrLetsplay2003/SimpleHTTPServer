@@ -37,7 +37,7 @@ public class HttpConnection extends AbstractConnection {
 		try {
 			socket.setSoTimeout(10000);
 		} catch (SocketException e) {
-			getServer().getLogger().debug("Error while intializing connection", e);
+			getServer().getLogger().error("Error while intializing connection", e);
 		}
 	}
 
@@ -60,7 +60,7 @@ public class HttpConnection extends AbstractConnection {
 					close();
 				}catch(Exception e) {
 					close();
-					getServer().getLogger().debug("Error in client receive loop", e);
+					getServer().getLogger().error("Error in client receive loop", e);
 					throw new ServerException("Error in client receive loop", e);
 				}
 			}
@@ -104,7 +104,7 @@ public class HttpConnection extends AbstractConnection {
 			if(sh.isAllowByteRanges()) applyRanges(sh);
 			if(sh.isCompressionEnabled()) applyCompression(sh);
 		}catch(Exception e) {
-			getServer().getLogger().debug("Error while creating page content", e);
+			getServer().getLogger().error("Error while creating page content", e);
 
 			// Reset all of the context-related fields to ensure a clean environment
 			sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
@@ -127,7 +127,7 @@ public class HttpConnection extends AbstractConnection {
 
 		InputStream in = sh.getContent();
 		long skipped = in.skip(sh.getContentOffset());
-		if(skipped < sh.getContentOffset()) getServer().getLogger().debug("Could not skip to content offset (skipped " + skipped + " of " + sh.getContentOffset() + " bytes)");
+		if(skipped < sh.getContentOffset()) getServer().getLogger().warn("Could not skip to content offset (skipped " + skipped + " of " + sh.getContentOffset() + " bytes)");
 
 		byte[] buf = new byte[4096];
 		int len;

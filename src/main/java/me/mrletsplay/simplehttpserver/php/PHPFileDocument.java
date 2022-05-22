@@ -111,7 +111,7 @@ public class PHPFileDocument implements HttpDocument {
 			}
 			c.getServerHeader().setContent(fallbackMimeType, postData, false);
 		} catch (IOException e) {
-			PHP.getLogger().debug("Error while running PHP-CGI", e);
+			PHP.getLogger().error("Error while running PHP-CGI", e);
 		}
 	}
 
