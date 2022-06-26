@@ -15,6 +15,14 @@ public class HtmlSelect extends HtmlElement {
 		appendChild(op);
 	}
 
+	public void addOption(String name, String value, boolean selected) {
+		HtmlOption op = new HtmlOption();
+		op.setText(name);
+		op.setValue(value);
+		op.setSelected(selected);
+		appendChild(op);
+	}
+
 	@Override
 	protected HtmlSelect copy(boolean deep) {
 		HtmlSelect e = new HtmlSelect();

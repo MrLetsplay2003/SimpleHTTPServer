@@ -22,6 +22,18 @@ public class HtmlOption extends HtmlElement {
 		return getAttribute("value");
 	}
 
+	public void setSelected(boolean selected) {
+		if(selected) {
+			setAttribute("selected");
+		}else {
+			unsetAttribute("selected");
+		}
+	}
+
+	public boolean isSelected() {
+		return getAttribute("selected") != null;
+	}
+
 	@Override
 	protected HtmlOption copy(boolean deep) {
 		HtmlOption e = new HtmlOption();
