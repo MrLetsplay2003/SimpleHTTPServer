@@ -44,7 +44,7 @@ public class HttpHeaderFields {
 		Map<String, String> cookies = new HashMap<>();
 		for(String c : getAll("Cookie")) {
 			for(String co : c.split("; ")) {
-				String[] kv = co.split("=");
+				String[] kv = co.split("=", 2);
 				cookies.put(kv[0], kv[1]);
 			}
 		}
