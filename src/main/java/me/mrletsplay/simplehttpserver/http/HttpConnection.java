@@ -115,9 +115,8 @@ public class HttpConnection extends AbstractConnection {
 			getServer().getDocumentProvider().get500Document().createContent();
 		}
 
-		if("keep-alive".equalsIgnoreCase(h.getFields().getFirst("Connection"))) {
-			sh.getFields().set("Connection", "keep-alive");
-		}
+		boolean keepAlive = !"close".equalsIgnoreCase(h.getFields().getFirst("Connection"));
+		if(keepAlive) sh.getFields().set("Connection", "keep-alive");
 
 		InputStream sIn = getSocket().getInputStream();
 		OutputStream sOut = getSocket().getOutputStream();
@@ -139,7 +138,7 @@ public class HttpConnection extends AbstractConnection {
 
 		sOut.flush();
 
-		return h.getFields().getFirst("Connection").equalsIgnoreCase("keep-alive") || websocketConnection != null;
+		return keepAlive || websocketConnection != null;
 	}
 
 	private void applyRanges(HttpServerHeader sh) {

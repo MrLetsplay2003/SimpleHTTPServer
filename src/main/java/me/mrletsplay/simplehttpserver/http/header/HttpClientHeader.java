@@ -1,5 +1,6 @@
 package me.mrletsplay.simplehttpserver.http.header;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
@@ -12,7 +13,7 @@ public class HttpClientHeader {
 	private String protocolVersion;
 	private HttpHeaderFields fields;
 	private byte[] postData;
-	
+
 	public HttpClientHeader(String method, HttpURLPath path, String protocolVersion, HttpHeaderFields fields, byte[] postData) {
 		this.method = method;
 		this.path = path;
@@ -20,27 +21,27 @@ public class HttpClientHeader {
 		this.fields = fields;
 		this.postData = postData;
 	}
-	
+
 	public String getMethod() {
 		return method;
 	}
-	
+
 	public HttpURLPath getPath() {
 		return path;
 	}
-	
+
 	public String getProtocolVersion() {
 		return protocolVersion;
 	}
-	
+
 	public HttpHeaderFields getFields() {
 		return fields;
 	}
-	
+
 	public PostData getPostData() {
 		return new PostData(fields, postData);
 	}
-	
+
 	public static HttpClientHeader parse(InputStream data) {
 		try {
 			String reqLine = readLine(data);
@@ -51,8 +52,10 @@ public class HttpClientHeader {
 			String protocolVersion = fs[2];
 			HttpHeaderFields fields = parseHeaders(data);
 			if(fields == null) return null;
-			String cL = fields.getFirst("Content-Length");
+
 			byte[] postData = new byte[0];
+
+			String cL = fields.getFirst("Content-Length");
 			if(cL != null) {
 				int contLength;
 				try {
@@ -68,12 +71,40 @@ public class HttpClientHeader {
 					actualLen += data.read(postData, actualLen, contLength - actualLen); // Retry reading remaining bytes until socket times out
 				}
 			}
+
+			String encoding = fields.getFirst("Transfer-Encoding");
+			if(encoding != null) {
+				if(!encoding.equalsIgnoreCase("chunked")) return null; // Unsupported transfer encoding, TODO: deflate, gzip
+				if(fields.has("Trailer")) return null; // Trailers are not supported
+				postData = readChunks(data);
+				if(postData == null) return null;
+			}
+
 			return new HttpClientHeader(method, path, protocolVersion, fields, postData);
 		}catch(IOException e) {
 			return null;
 		}
 	}
-	
+
+	public static byte[] readChunks(InputStream in) throws IOException {
+		ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+
+		while(true) {
+			String lenStr = readLine(in);
+			int len = Integer.parseInt(lenStr, 16);
+			if(len == 0) break;
+			byte[] buf = new byte[len];
+			if(in.read(buf) != len) return null;
+			bOut.write(buf);
+			if(in.read() != '\r') return null;
+			if(in.read() != '\n') return null;
+		}
+
+		if(in.read() != '\r') return null;
+		if(in.read() != '\n') return null;
+		return bOut.toByteArray();
+	}
+
 	public static HttpHeaderFields parseHeaders(InputStream in) throws IOException {
 		HttpHeaderFields fields = new HttpHeaderFields();
 		String l;
@@ -87,7 +118,7 @@ public class HttpClientHeader {
 		}
 		return fields;
 	}
-	
+
 	private static String readLine(InputStream in) throws IOException {
 		StringBuilder b = new StringBuilder();
 		int c;
@@ -95,10 +126,10 @@ public class HttpClientHeader {
 			b.appendCodePoint(c);
 		}
 		if(c == -1) return null;
-		in.read(); // == LF
+		if(in.read() != '\n') return null;
 		return b.toString();
 	}
-	
+
 	@Override
 	public boolean equals(Object obj) {
 		if(!(obj instanceof HttpClientHeader)) return false;
@@ -109,10 +140,10 @@ public class HttpClientHeader {
 				&& fields.equals(o.fields)
 				&& Arrays.equals(postData, o.postData);
 	}
-	
+
 	@Override
 	public int hashCode() {
 		return Objects.hash(method, path, protocolVersion, fields, Arrays.hashCode(postData));
 	}
-	
+
 }

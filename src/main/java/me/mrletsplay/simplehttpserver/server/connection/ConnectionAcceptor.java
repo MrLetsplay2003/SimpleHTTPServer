@@ -1,6 +1,7 @@
 package me.mrletsplay.simplehttpserver.server.connection;
 
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Collection;
 
 import me.mrletsplay.simplehttpserver.server.Server;
@@ -19,7 +20,7 @@ public interface ConnectionAcceptor {
 	public Server getServer();
 
 	public default void closeAllConnections() {
-		for(Connection c : getActiveConnections()) {
+		for(Connection c : new ArrayList<>(getActiveConnections())) {
 			try {
 				c.close();
 			} catch(ServerException e) {

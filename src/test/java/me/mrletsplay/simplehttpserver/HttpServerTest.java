@@ -32,11 +32,11 @@ public class HttpServerTest {
 
 		server.start();
 
-		 assertEquals("Hello World!", HttpRequest.createGet("http://localhost:12345/test").execute().asString());
-		 assertEquals("one", HttpRequest.createGet("http://localhost:12345/pattern/one").execute().asString());
-		 assertEquals("two", HttpRequest.createGet("http://localhost:12345/pattern/two").execute().asString());
+		assertEquals("Hello World!", HttpRequest.createGet("http://localhost:12345/test").execute().asString());
+		assertEquals("one", HttpRequest.createGet("http://localhost:12345/pattern/one").execute().asString());
+		assertEquals("two", HttpRequest.createGet("http://localhost:12345/pattern/two").execute().asString());
 
-		 server.shutdown();
+		server.shutdown();
 	}
 
 }
