@@ -116,7 +116,7 @@ public class HttpConnection extends AbstractConnection {
 		}
 
 		boolean keepAlive = !"close".equalsIgnoreCase(h.getFields().getFirst("Connection"));
-		if(keepAlive) sh.getFields().set("Connection", "keep-alive");
+		if(keepAlive && !sh.getFields().has("Connection")) sh.getFields().set("Connection", "keep-alive");
 
 		InputStream sIn = getSocket().getInputStream();
 		OutputStream sOut = getSocket().getOutputStream();
