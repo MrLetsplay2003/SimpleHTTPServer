@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>me.mrletsplay</groupId>
 	<artifactId>SimpleHTTPServer</artifactId>
-	<version>1.2.4</version>
+	<version>1.2.5</version>
 	<build>
 		<sourceDirectory>src/main/java</sourceDirectory>
 		<plugins>
@@ -53,7 +53,7 @@
 	<repositories>
 		<repository>
 			<id>Graphite-Official</id>
-			<url>http://maven.graphite-official.com/</url>
+			<url>https://maven.graphite-official.com/</url>
 		</repository>
 	</repositories>
 

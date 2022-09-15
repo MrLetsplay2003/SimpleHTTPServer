@@ -28,7 +28,7 @@ public class HttpHeaderFields {
 	}
 
 	public boolean has(String name) {
-		return fields.containsKey(name);
+		return fields.containsKey(name.toLowerCase());
 	}
 
 	public List<String> getAll(String name) {
