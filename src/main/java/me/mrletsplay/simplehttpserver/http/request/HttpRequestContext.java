@@ -5,6 +5,7 @@ import java.util.Map;
 
 import me.mrletsplay.simplehttpserver.http.HttpConnection;
 import me.mrletsplay.simplehttpserver.http.HttpServer;
+import me.mrletsplay.simplehttpserver.http.HttpStatusCode;
 import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpURLPath;
@@ -81,6 +82,11 @@ public class HttpRequestContext {
 
 	public Exception getException() {
 		return exception;
+	}
+
+	public void redirect(HttpStatusCode code, String location) {
+		serverHeader.setStatusCode(code);
+		serverHeader.getFields().set("Location", location);
 	}
 
 	public static HttpRequestContext getCurrentContext() {
