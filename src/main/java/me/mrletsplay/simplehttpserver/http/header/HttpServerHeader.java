@@ -15,16 +15,16 @@ public class HttpServerHeader {
 	private HttpStatusCode statusCode;
 	private HttpHeaderFields fields;
 	private InputStream content;
-	
+
 	private long
 		contentOffset,
 		contentLength,
 		totalContentLength;
-	
+
 	private boolean
 		compressionEnabled,
 		allowByteRanges;
-	
+
 	public HttpServerHeader(HttpProtocolVersion protocolVersion, HttpStatusCode statusCode, HttpHeaderFields fields) {
 		this.protocolVersion = protocolVersion;
 		this.statusCode = statusCode;
@@ -33,47 +33,47 @@ public class HttpServerHeader {
 		this.allowByteRanges = true;
 		setContent(new byte[0]);
 	}
-	
+
 	public void setProtocolVersion(HttpProtocolVersion protocolVersion) {
 		this.protocolVersion = protocolVersion;
 	}
-	
+
 	public HttpProtocolVersion getProtocolVersion() {
 		return protocolVersion;
 	}
-	
+
 	public void setStatusCode(HttpStatusCode statusCode) {
 		this.statusCode = statusCode;
 	}
-	
+
 	public HttpStatusCode getStatusCode() {
 		return statusCode;
 	}
-	
+
 	public HttpHeaderFields getFields() {
 		return fields;
 	}
-	
+
 	public void setContent(byte[] content) {
 		setContent(null, content, false);
 	}
-	
+
 	public void setContent(String type, byte[] content) {
 		setContent(type, content, true);
 	}
-	
+
 	public void setContent(String type, byte[] content, boolean forceContentType) {
 		setContent(type, new ByteArrayInputStream(content), content.length, forceContentType);
 	}
-	
+
 	public void setContent(InputStream content, long length) {
 		setContent(null, content, length, false);
 	}
-	
+
 	public void setContent(String type, InputStream content, long length) {
 		setContent(type, content, length, true);
 	}
-	
+
 	public void setContent(String type, InputStream content, long length, boolean forceContentType) {
 		if(fields.getAll("Content-Type").isEmpty() || forceContentType) {
 			fields.set("Content-Type", type == null ? "application/unknown" : (type + "; charset=utf-8")); // TODO: charset?
@@ -82,52 +82,52 @@ public class HttpServerHeader {
 		setContentLength(length);
 		setTotalContentLength(length);
 	}
-	
+
 	public InputStream getContent() {
 		return content;
 	}
-	
+
 	public void setContentLength(long contentLength) {
 		this.contentLength = contentLength;
 		fields.set("Content-Length", String.valueOf(contentLength));
 	}
-	
+
 	public long getContentLength() {
 		return contentLength;
 	}
-	
+
 	public void setContentOffset(long contentOffset) {
 		this.contentOffset = contentOffset;
 	}
-	
+
 	public long getContentOffset() {
 		return contentOffset;
 	}
-	
+
 	public void setTotalContentLength(long totalContentLength) {
 		this.totalContentLength = totalContentLength;
 	}
-	
+
 	public long getTotalContentLength() {
 		return totalContentLength;
 	}
-	
+
 	public void setCompressionEnabled(boolean compressionEnabled) {
 		this.compressionEnabled = compressionEnabled;
 	}
-	
+
 	public boolean isCompressionEnabled() {
 		return compressionEnabled;
 	}
-	
+
 	public void setAllowByteRanges(boolean allowByteRanges) {
 		this.allowByteRanges = allowByteRanges;
 	}
-	
+
 	public boolean isAllowByteRanges() {
 		return allowByteRanges;
 	}
-	
+
 	public byte[] getHeaderBytes() {
 		String header = protocolVersion.getVersionString() + " " + statusCode.getStatusCode() + " " + statusCode.getStatusMessage() + "\r\n";
 		if(allowByteRanges) fields.set("Accept-Ranges", "bytes");
@@ -139,5 +139,5 @@ public class HttpServerHeader {
 		header += "\r\n";
 		return header.getBytes(StandardCharsets.UTF_8);
 	}
-	
+
 }
