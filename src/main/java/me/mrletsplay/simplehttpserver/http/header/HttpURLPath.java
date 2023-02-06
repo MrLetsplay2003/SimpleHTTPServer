@@ -60,4 +60,33 @@ public class HttpURLPath {
 		return documentPath + (query.isEmpty() ? "" : "?" + query.toString());
 	}
 
+	public static Builder builder(String documentPath) {
+		return new Builder(new HttpURLPath(documentPath));
+	}
+
+	public static class Builder implements me.mrletsplay.mrcore.misc.Builder<HttpURLPath, Builder> {
+
+		private HttpURLPath path;
+
+		private Builder(HttpURLPath path) {
+			this.path = path;
+		}
+
+		public Builder addQuery(String key, String value) {
+			path.getQuery().add(key, value);
+			return this;
+		}
+
+		public Builder setQuery(String key, String value) {
+			path.getQuery().set(key, value);
+			return this;
+		}
+
+		@Override
+		public HttpURLPath create() throws IllegalStateException {
+			return path;
+		}
+
+	}
+
 }

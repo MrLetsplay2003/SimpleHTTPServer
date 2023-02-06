@@ -19,6 +19,7 @@ import me.mrletsplay.mrcore.io.IOUtils;
 import me.mrletsplay.mrcore.misc.FriendlyException;
 import me.mrletsplay.simplehttpserver.http.compression.HttpCompressionMethod;
 import me.mrletsplay.simplehttpserver.http.document.HttpDocument;
+import me.mrletsplay.simplehttpserver.http.exception.HttpResponseException;
 import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpHeaderFields;
 import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
@@ -97,9 +98,16 @@ public class HttpConnection extends AbstractConnection {
 		if(d == null) d = getServer().getDocumentProvider().get404Document();
 
 		try {
-			d.createContent();
+			try {
+				d.createContent();
 
-			sh = ctx.getServerHeader();
+				sh = ctx.getServerHeader();
+			}catch(HttpResponseException e) {
+				sh = new HttpServerHeader(getServer().getProtocolVersion(), e.getStatusCode(), new HttpHeaderFields());
+				String statusMessage = e.getStatusMessage();
+				if(statusMessage == null) statusMessage = "Error " + e.getStatusCode().getStatusCode();
+				sh.setContent("text/plain", statusMessage.getBytes(StandardCharsets.UTF_8));
+			}
 
 			if(sh.isAllowByteRanges()) applyRanges(sh);
 			if(sh.isCompressionEnabled()) applyCompression(sh);
