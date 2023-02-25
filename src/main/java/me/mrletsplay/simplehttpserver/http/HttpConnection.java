@@ -203,10 +203,12 @@ public class HttpConnection extends AbstractConnection {
 				.findFirst().orElse(null);
 		if(comp != null) {
 			InputStream content = sh.getContent();
-			sh.getFields().set("Content-Encoding", comp.getName());
-
 			byte[] uncompressedContent = IOUtils.readAllBytes(content);
-			sh.setContent(comp.compress(uncompressedContent));
+
+			if(uncompressedContent.length > 0) {
+				sh.getFields().set("Content-Encoding", comp.getName());
+				sh.setContent(comp.compress(uncompressedContent));
+			}
 		}
 	}
 
