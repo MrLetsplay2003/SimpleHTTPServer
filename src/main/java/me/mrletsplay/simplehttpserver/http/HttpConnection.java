@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 
 import javax.net.ssl.SSLSocket;
 
-import me.mrletsplay.mrcore.io.IOUtils;
 import me.mrletsplay.mrcore.misc.FriendlyException;
 import me.mrletsplay.simplehttpserver.http.compression.HttpCompressionMethod;
 import me.mrletsplay.simplehttpserver.http.document.HttpDocument;
@@ -194,6 +193,7 @@ public class HttpConnection extends AbstractConnection {
 		HttpRequestContext ctx = HttpRequestContext.getCurrentContext();
 
 		if(ctx.getClientHeader().getFields().getFirst("Accept-Encoding") == null) return;
+		if(sh.getContentLength() == 0 || sh.getContentLength() > Integer.MAX_VALUE) return;
 
 		List<String> supCs = Arrays.stream(ctx.getClientHeader().getFields().getFirst("Accept-Encoding").split(","))
 				.map(String::trim)
@@ -203,12 +203,9 @@ public class HttpConnection extends AbstractConnection {
 				.findFirst().orElse(null);
 		if(comp != null) {
 			InputStream content = sh.getContent();
-			byte[] uncompressedContent = IOUtils.readAllBytes(content);
-
-			if(uncompressedContent.length > 0) {
-				sh.getFields().set("Content-Encoding", comp.getName());
-				sh.setContent(comp.compress(uncompressedContent));
-			}
+			byte[] uncompressedContent = content.readNBytes((int) sh.getContentLength());
+			sh.getFields().set("Content-Encoding", comp.getName());
+			sh.setContent(comp.compress(uncompressedContent));
 		}
 	}
 
