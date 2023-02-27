@@ -57,7 +57,7 @@ public class SSLCertificateSocketFactory {
 
 	private SSLServerSocketFactory socketFactory;
 
-	public SSLCertificateSocketFactory(File certificateFile, File certificatePrivateKeyFile, String certificatePassword) throws FileNotFoundException, IOException, GeneralSecurityException, NullPointerException {
+	public SSLCertificateSocketFactory(File certificateFile, File certificatePrivateKeyFile, String certificatePassword) throws FileNotFoundException, IOException, GeneralSecurityException {
 		this.certificateFile = certificateFile;
 		this.certificatePrivateKeyFile = certificatePrivateKeyFile;
 		this.certificatePassword = certificatePassword;
@@ -65,7 +65,7 @@ public class SSLCertificateSocketFactory {
 		load();
 	}
 
-	private void load() throws FileNotFoundException, IOException, GeneralSecurityException, NullPointerException {
+	private void load() throws FileNotFoundException, IOException, GeneralSecurityException {
 		KeyStore keyStore = KeyStore.getInstance("JKS");
 		keyStore.load(null);
 		if(this.isP7b){
@@ -142,14 +142,14 @@ public class SSLCertificateSocketFactory {
 		return privKey;
 	}
 	
-	private Certificate[] loadP7b(File certFile) throws GeneralSecurityException, FileNotFoundException, IOException, NullPointerException {
+	private Certificate[] loadP7b(File certFile) throws GeneralSecurityException, FileNotFoundException, IOException {
 		try(FileInputStream in = new FileInputStream(certFile)) {
 			return readCertificatesFromPKCS7(getBytesFromP7bString(new String(IOUtils.readAllBytes(in), StandardCharsets.UTF_8)));
 		}
 	}
 
 	
-	private final Certificate[] readCertificatesFromPKCS7(byte[] binaryPKCS7Store) throws GeneralSecurityException, IOException, NullPointerException {
+	private final Certificate[] readCertificatesFromPKCS7(byte[] binaryPKCS7Store) throws GeneralSecurityException, IOException {
 	    try (ByteArrayInputStream bais = new ByteArrayInputStream(binaryPKCS7Store);) {
 	        CertificateFactory cf = CertificateFactory.getInstance("X.509");
 	        Collection<?> c = cf.generateCertificates(bais);
@@ -157,7 +157,7 @@ public class SSLCertificateSocketFactory {
 	        List<Certificate> certList = new ArrayList<Certificate>();
 
 	        if (c.isEmpty()) {
-	        	throw new NullPointerException();
+	        	throw new GeneralSecurityException("p7b is empty");
 	        }
 	        else {
 
@@ -168,7 +168,7 @@ public class SSLCertificateSocketFactory {
 	            }
 	        }
 
-	        java.security.cert.Certificate[] certArr = new java.security.cert.Certificate[certList.size()];
+	        Certificate[] certArr = new Certificate[certList.size()];
 
 	        return certList.toArray(certArr);
 	    }
