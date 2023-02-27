@@ -19,6 +19,10 @@ import java.security.cert.CertificateFactory;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
+import java.util.Collection;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Iterator;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -40,6 +44,8 @@ public class SSLCertificateSocketFactory {
 
 	private String certificatePassword;
 
+	private boolean isP7b;
+
 	private Certificate[] certificateChain;
 
 	private TrustManager[] trustManagers;
@@ -54,13 +60,19 @@ public class SSLCertificateSocketFactory {
 		this.certificateFile = certificateFile;
 		this.certificatePrivateKeyFile = certificatePrivateKeyFile;
 		this.certificatePassword = certificatePassword;
+		this.isP7b = certificateFile.getName().endsWith(".p7b");
 		load();
 	}
 
 	private void load() throws FileNotFoundException, IOException, GeneralSecurityException {
 		KeyStore keyStore = KeyStore.getInstance("JKS");
 		keyStore.load(null);
-		this.certificateChain = loadCertificateChain(certificateFile);
+		if(this.isP7b){
+			this.certificateChain = loadP7b(certificateFile);
+		}
+		else {
+			this.certificateChain = loadCertificateChain(certificateFile);
+		}
 		for(int i = 0; i < certificateChain.length; i++) {
 			keyStore.setCertificateEntry("certificate" + i, certificateChain[i]);
 		}
@@ -127,6 +139,46 @@ public class SSLCertificateSocketFactory {
 		PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(encoded);
 		RSAPrivateKey privKey = (RSAPrivateKey) kf.generatePrivate(keySpec);
 		return privKey;
+	}
+	
+	private Certificate[] loadP7b(File certFile) throws GeneralSecurityException, FileNotFoundException, IOException {
+		try(FileInputStream in = new FileInputStream(certFile)) {
+			return readCertificatesFromPKCS7(getBytesFromP7bString(new String(IOUtils.readAllBytes(in), StandardCharsets.UTF_8)));
+		}
+	}
+
+	
+	private final Certificate[] readCertificatesFromPKCS7(byte[] binaryPKCS7Store) throws GeneralSecurityException, IOException, NullPointerException {
+	    try (ByteArrayInputStream bais = new ByteArrayInputStream(binaryPKCS7Store);) {
+	        CertificateFactory cf = CertificateFactory.getInstance("X.509");
+	        Collection<?> c = cf.generateCertificates(bais);
+
+	        List<Certificate> certList = new ArrayList<Certificate>();
+
+	        if (c.isEmpty()) {
+	        	throw new NullPointerException();
+	        }
+	        else {
+
+	            Iterator<?> i = c.iterator();
+
+	            while (i.hasNext()) {
+	                certList.add((Certificate) i.next());
+	            }
+	        }
+
+	        java.security.cert.Certificate[] certArr = new java.security.cert.Certificate[certList.size()];
+
+	        return certList.toArray(certArr);
+	    }
+	}
+	
+	private byte[] getBytesFromP7bString(String key) throws IOException, GeneralSecurityException {
+		String privateKeyPEM = key;
+		privateKeyPEM = privateKeyPEM.replace("-----BEGIN PKCS7-----", "");
+		privateKeyPEM = privateKeyPEM.replace("-----END PKCS7-----", "");
+		byte[] encoded = Base64.getDecoder().decode(privateKeyPEM.replace("\n", "").replace("\r", ""));
+		return encoded;
 	}
 
 }
