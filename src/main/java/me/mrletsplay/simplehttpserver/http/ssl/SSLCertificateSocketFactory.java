@@ -57,7 +57,7 @@ public class SSLCertificateSocketFactory {
 
 	private SSLServerSocketFactory socketFactory;
 
-	public SSLCertificateSocketFactory(File certificateFile, File certificatePrivateKeyFile, String certificatePassword) throws FileNotFoundException, IOException, GeneralSecurityException {
+	public SSLCertificateSocketFactory(File certificateFile, File certificatePrivateKeyFile, String certificatePassword) throws FileNotFoundException, IOException, GeneralSecurityException, NullPointerException {
 		this.certificateFile = certificateFile;
 		this.certificatePrivateKeyFile = certificatePrivateKeyFile;
 		this.certificatePassword = certificatePassword;
@@ -65,7 +65,7 @@ public class SSLCertificateSocketFactory {
 		load();
 	}
 
-	private void load() throws FileNotFoundException, IOException, GeneralSecurityException {
+	private void load() throws FileNotFoundException, IOException, GeneralSecurityException, NullPointerException {
 		KeyStore keyStore = KeyStore.getInstance("JKS");
 		keyStore.load(null);
 		if(this.isP7b){
@@ -142,7 +142,7 @@ public class SSLCertificateSocketFactory {
 		return privKey;
 	}
 	
-	private Certificate[] loadP7b(File certFile) throws GeneralSecurityException, FileNotFoundException, IOException {
+	private Certificate[] loadP7b(File certFile) throws GeneralSecurityException, FileNotFoundException, IOException, NullPointerException {
 		try(FileInputStream in = new FileInputStream(certFile)) {
 			return readCertificatesFromPKCS7(getBytesFromP7bString(new String(IOUtils.readAllBytes(in), StandardCharsets.UTF_8)));
 		}
