@@ -40,7 +40,7 @@ public class SSLCertificateSocketFactory {
 
 	private String certificatePassword;
 
-	private Certificate certificate;
+	private Certificate[] certificateChain;
 
 	private TrustManager[] trustManagers;
 
@@ -60,9 +60,11 @@ public class SSLCertificateSocketFactory {
 	private void load() throws FileNotFoundException, IOException, GeneralSecurityException {
 		KeyStore keyStore = KeyStore.getInstance("JKS");
 		keyStore.load(null);
-		this.certificate = loadCertificate(certificateFile);
-		keyStore.setCertificateEntry("certificate", certificate);
-		keyStore.setKeyEntry("certificateKey", loadCertificateKey(certificatePrivateKeyFile), certificatePassword != null ? certificatePassword.toCharArray() : new char[0], new Certificate[] {certificate});
+		this.certificateChain = loadCertificateChain(certificateFile);
+		for(int i = 0; i < certificateChain.length; i++) {
+			keyStore.setCertificateEntry("certificate" + i, certificateChain[i]);
+		}
+		keyStore.setKeyEntry("certificateKey", loadCertificateKey(certificatePrivateKeyFile), certificatePassword != null ? certificatePassword.toCharArray() : new char[0], certificateChain);
 		this.trustManagers = createTrustManagers(keyStore);
 		this.keyManagers = createKeyManagers(keyStore);
 
@@ -75,8 +77,7 @@ public class SSLCertificateSocketFactory {
 		return (SSLServerSocket) socketFactory.createServerSocket(port, 50, InetAddress.getByName(host));
 	}
 
-	private X509TrustManager[] createTrustManagers(KeyStore keystore)
-		throws NoSuchAlgorithmException, KeyStoreException {
+	private X509TrustManager[] createTrustManagers(KeyStore keystore) throws NoSuchAlgorithmException, KeyStoreException {
 		TrustManagerFactory trustMgrFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
 		trustMgrFactory.init(keystore);
 		TrustManager trustManagers[] = trustMgrFactory.getTrustManagers();
@@ -104,10 +105,10 @@ public class SSLCertificateSocketFactory {
 		return null;
 	}
 
-	private Certificate loadCertificate(File certFile) throws CertificateException, FileNotFoundException, IOException {
+	private Certificate[] loadCertificateChain(File certFile) throws CertificateException, FileNotFoundException, IOException {
 		CertificateFactory f = CertificateFactory.getInstance("X.509");
 		try(FileInputStream in = new FileInputStream(certFile)) {
-			return f.generateCertificate(in);
+			return f.generateCertificates(in).toArray(Certificate[]::new);
 		}
 	}
 
