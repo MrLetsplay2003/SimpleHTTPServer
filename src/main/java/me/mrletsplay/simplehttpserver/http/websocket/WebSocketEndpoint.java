@@ -15,6 +15,7 @@ import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpHeaderFields;
 import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
+import me.mrletsplay.simplehttpserver.http.util.MimeType;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketFrame;
 
@@ -47,7 +48,7 @@ public abstract class WebSocketEndpoint implements HttpDocument {
 				|| clientFields.getFirst("Sec-WebSocket-Key") == null
 				|| clientFields.getFirst("Sec-WebSocket-Version") == null) {
 			sH.setStatusCode(HttpStatusCodes.BAD_REQUEST_400);
-			sH.setContent("text/plain", "400 Bad Request".getBytes(StandardCharsets.UTF_8));
+			sH.setContent(MimeType.TEXT, "400 Bad Request".getBytes(StandardCharsets.UTF_8));
 			return;
 		}
 
@@ -59,7 +60,7 @@ public abstract class WebSocketEndpoint implements HttpDocument {
 		if(!version.equals("13")) {
 			sH.setStatusCode(HttpStatusCodes.BAD_REQUEST_400);
 			sH.getFields().set("Sec-WebSocket-Version", "13");
-			sH.setContent("text/plain", "400 Bad Request".getBytes(StandardCharsets.UTF_8));
+			sH.setContent(MimeType.TEXT, "400 Bad Request".getBytes(StandardCharsets.UTF_8));
 			return;
 		}
 

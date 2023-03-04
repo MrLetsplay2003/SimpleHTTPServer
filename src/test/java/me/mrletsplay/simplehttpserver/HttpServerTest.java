@@ -7,9 +7,11 @@ import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 
 import me.mrletsplay.mrcore.http.HttpRequest;
-import me.mrletsplay.simplehttpserver.http.HttpServer;
-import me.mrletsplay.simplehttpserver.http.HttpServerConfiguration;
+import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
+import me.mrletsplay.simplehttpserver.http.server.HttpServer;
+import me.mrletsplay.simplehttpserver.http.server.HttpServerConfiguration;
+import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
 public class HttpServerTest {
 
@@ -21,13 +23,13 @@ public class HttpServerTest {
 			.debugMode(true)
 			.create());
 
-		server.getDocumentProvider().registerDocument("/test", () -> {
-			HttpRequestContext.getCurrentContext().getServerHeader().setContent("text/plain", "Hello World!".getBytes(StandardCharsets.UTF_8));
+		server.getDocumentProvider().register(HttpRequestMethod.GET, "/test", () -> {
+			HttpRequestContext.getCurrentContext().getServerHeader().setContent(MimeType.TEXT, "Hello World!".getBytes(StandardCharsets.UTF_8));
 		});
 
-		server.getDocumentProvider().registerDocumentPattern("/pattern/{name}", () -> {
+		server.getDocumentProvider().registerPattern(HttpRequestMethod.GET, "/pattern/{name}", () -> {
 			HttpRequestContext ctx = HttpRequestContext.getCurrentContext();
-			ctx.getServerHeader().setContent("text/plain", ctx.getPathParameters().get("name").getBytes(StandardCharsets.UTF_8));
+			ctx.getServerHeader().setContent(MimeType.TEXT, ctx.getPathParameters().get("name").getBytes(StandardCharsets.UTF_8));
 		});
 
 		server.start();

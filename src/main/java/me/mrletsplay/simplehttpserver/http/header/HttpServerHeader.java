@@ -8,6 +8,7 @@ import java.util.Map;
 
 import me.mrletsplay.simplehttpserver.http.HttpProtocolVersion;
 import me.mrletsplay.simplehttpserver.http.HttpStatusCode;
+import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
 public class HttpServerHeader {
 
@@ -31,7 +32,7 @@ public class HttpServerHeader {
 		this.fields = fields;
 		this.compressionEnabled = true;
 		this.allowByteRanges = true;
-		setContent(new byte[0]);
+		setContent(MimeType.TEXT, new byte[0]);
 	}
 
 	public void setProtocolVersion(HttpProtocolVersion protocolVersion) {
@@ -58,11 +59,11 @@ public class HttpServerHeader {
 		setContent(null, content, false);
 	}
 
-	public void setContent(String type, byte[] content) {
+	public void setContent(MimeType type, byte[] content) {
 		setContent(type, content, true);
 	}
 
-	public void setContent(String type, byte[] content, boolean forceContentType) {
+	public void setContent(MimeType type, byte[] content, boolean forceContentType) {
 		setContent(type, new ByteArrayInputStream(content), content.length, forceContentType);
 	}
 
@@ -70,13 +71,14 @@ public class HttpServerHeader {
 		setContent(null, content, length, false);
 	}
 
-	public void setContent(String type, InputStream content, long length) {
+	public void setContent(MimeType type, InputStream content, long length) {
 		setContent(type, content, length, true);
 	}
 
-	public void setContent(String type, InputStream content, long length, boolean forceContentType) {
+	public void setContent(MimeType type, InputStream content, long length, boolean forceContentType) {
+		MimeType effectiveType = type == null ? MimeType.UNKNOWN : type;
 		if(fields.getAll("Content-Type").isEmpty() || forceContentType) {
-			fields.set("Content-Type", type == null ? "application/unknown" : (type + "; charset=utf-8")); // TODO: charset?
+			fields.set("Content-Type", effectiveType.toString()); // TODO: charset?
 		}
 		this.content = content;
 		setContentLength(length);

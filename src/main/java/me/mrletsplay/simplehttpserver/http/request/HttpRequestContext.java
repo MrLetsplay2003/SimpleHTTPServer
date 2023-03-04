@@ -3,12 +3,14 @@ package me.mrletsplay.simplehttpserver.http.request;
 import java.util.HashMap;
 import java.util.Map;
 
-import me.mrletsplay.simplehttpserver.http.HttpConnection;
-import me.mrletsplay.simplehttpserver.http.HttpServer;
 import me.mrletsplay.simplehttpserver.http.HttpStatusCode;
+import me.mrletsplay.simplehttpserver.http.HttpStatusCodes;
 import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
-import me.mrletsplay.simplehttpserver.http.header.HttpURLPath;
+import me.mrletsplay.simplehttpserver.http.header.HttpUrlPath;
+import me.mrletsplay.simplehttpserver.http.response.HttpResponse;
+import me.mrletsplay.simplehttpserver.http.server.HttpServer;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
 
 public class HttpRequestContext {
 
@@ -40,7 +42,7 @@ public class HttpRequestContext {
 		return clientHeader;
 	}
 
-	public HttpURLPath getRequestedPath() {
+	public HttpUrlPath getRequestedPath() {
 		return clientHeader.getPath();
 	}
 
@@ -87,6 +89,14 @@ public class HttpRequestContext {
 	public void redirect(HttpStatusCode code, String location) {
 		serverHeader.setStatusCode(code);
 		serverHeader.getFields().set("Location", location);
+	}
+
+	public void redirect(String location) {
+		redirect(HttpStatusCodes.FOUND_302, location);
+	}
+
+	public void respond(HttpStatusCode statusCode, HttpResponse response) {
+		serverHeader.setContent(response.getContentType(), response.getContent());
 	}
 
 	public static HttpRequestContext getCurrentContext() {

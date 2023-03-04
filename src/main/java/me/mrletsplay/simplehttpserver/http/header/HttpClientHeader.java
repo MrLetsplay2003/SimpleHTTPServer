@@ -6,15 +6,17 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Objects;
 
+import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
+
 public class HttpClientHeader {
 
-	private String method;
-	private HttpURLPath path;
+	private HttpRequestMethod method;
+	private HttpUrlPath path;
 	private String protocolVersion;
 	private HttpHeaderFields fields;
 	private byte[] postData;
 
-	public HttpClientHeader(String method, HttpURLPath path, String protocolVersion, HttpHeaderFields fields, byte[] postData) {
+	public HttpClientHeader(HttpRequestMethod method, HttpUrlPath path, String protocolVersion, HttpHeaderFields fields, byte[] postData) {
 		this.method = method;
 		this.path = path;
 		this.protocolVersion = protocolVersion;
@@ -22,11 +24,11 @@ public class HttpClientHeader {
 		this.postData = postData;
 	}
 
-	public String getMethod() {
+	public HttpRequestMethod getMethod() {
 		return method;
 	}
 
-	public HttpURLPath getPath() {
+	public HttpUrlPath getPath() {
 		return path;
 	}
 
@@ -46,9 +48,16 @@ public class HttpClientHeader {
 		try {
 			String reqLine = readLine(data);
 			if(reqLine == null) return null;
+
 			String[] fs = reqLine.split(" ");
-			String method = fs[0];
-			HttpURLPath path = HttpURLPath.parse(fs[1]);
+			if(fs.length != 3) return null;
+
+			HttpRequestMethod method = HttpRequestMethod.get(fs[0]);
+			if(method == null) return null;
+
+			HttpUrlPath path = HttpUrlPath.parse(fs[1]);
+			if(path == null) return null;
+
 			String protocolVersion = fs[2];
 			HttpHeaderFields fields = parseHeaders(data);
 			if(fields == null) return null;

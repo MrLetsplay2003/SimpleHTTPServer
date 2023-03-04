@@ -6,11 +6,11 @@ import me.mrletsplay.simplehttpserver.http.HttpStatusCodes;
 import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
 
-public class Default404Document implements HttpDocument {
+public class DefaultNotFoundDocument implements HttpDocument {
 
 	private HtmlDocument doc;
 
-	public Default404Document() {
+	public DefaultNotFoundDocument() {
 		this.doc = new HtmlDocument();
 		doc.setTitle("404 Not Found");
 		doc.setDescription("404 Page");

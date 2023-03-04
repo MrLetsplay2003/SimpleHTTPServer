@@ -6,7 +6,7 @@ import java.util.zip.GZIPOutputStream;
 
 import me.mrletsplay.mrcore.misc.FriendlyException;
 
-public class GZIPCompression implements HttpCompressionMethod {
+public class GzipCompression implements HttpCompressionMethod {
 
 	@Override
 	public String getName() {

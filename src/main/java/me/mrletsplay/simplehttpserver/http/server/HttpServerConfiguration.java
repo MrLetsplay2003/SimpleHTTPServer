@@ -1,4 +1,4 @@
-package me.mrletsplay.simplehttpserver.http;
+package me.mrletsplay.simplehttpserver.http.server;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

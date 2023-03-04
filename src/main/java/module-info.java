@@ -18,6 +18,10 @@ module simplehttpserver {
 	exports me.mrletsplay.simplehttpserver.dom.html;
 	exports me.mrletsplay.simplehttpserver.http.request.form;
 	exports me.mrletsplay.simplehttpserver.dom.css;
+	exports me.mrletsplay.simplehttpserver.http.util;
+	exports me.mrletsplay.simplehttpserver.http.response;
+	exports me.mrletsplay.simplehttpserver.http.server;
+	exports me.mrletsplay.simplehttpserver.http.server.connection;
 
 	requires transitive me.mrletsplay.mrcore;
 	requires transitive org.slf4j;

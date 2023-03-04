@@ -8,6 +8,7 @@ import me.mrletsplay.simplehttpserver.dom.html.element.HtmlMeta;
 import me.mrletsplay.simplehttpserver.dom.html.element.HtmlScript;
 import me.mrletsplay.simplehttpserver.http.document.HttpDocument;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
+import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
 public class HtmlDocument implements HttpDocument {
 
@@ -123,7 +124,7 @@ public class HtmlDocument implements HttpDocument {
 
 	@Override
 	public void createContent() {
-		HttpRequestContext.getCurrentContext().getServerHeader().setContent("text/html", ("<!DOCTYPE html>" + html.toString()).getBytes(StandardCharsets.UTF_8));
+		HttpRequestContext.getCurrentContext().getServerHeader().setContent(MimeType.HTML, ("<!DOCTYPE html>" + html.toString()).getBytes(StandardCharsets.UTF_8));
 	}
 
 }

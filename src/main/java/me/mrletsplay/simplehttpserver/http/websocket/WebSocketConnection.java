@@ -3,7 +3,7 @@ package me.mrletsplay.simplehttpserver.http.websocket;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-import me.mrletsplay.simplehttpserver.http.HttpConnection;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.BinaryFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.PongFrame;

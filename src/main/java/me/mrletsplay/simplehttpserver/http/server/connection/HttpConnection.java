@@ -1,4 +1,4 @@
-package me.mrletsplay.simplehttpserver.http;
+package me.mrletsplay.simplehttpserver.http.server.connection;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import javax.net.ssl.SSLSocket;
 
 import me.mrletsplay.mrcore.misc.FriendlyException;
+import me.mrletsplay.simplehttpserver.http.HttpStatusCodes;
 import me.mrletsplay.simplehttpserver.http.compression.HttpCompressionMethod;
 import me.mrletsplay.simplehttpserver.http.document.HttpDocument;
 import me.mrletsplay.simplehttpserver.http.exception.HttpResponseException;
@@ -23,6 +24,8 @@ import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpHeaderFields;
 import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
+import me.mrletsplay.simplehttpserver.http.server.HttpServer;
+import me.mrletsplay.simplehttpserver.http.util.MimeType;
 import me.mrletsplay.simplehttpserver.http.websocket.WebSocketConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
 import me.mrletsplay.simplehttpserver.server.ServerException;
@@ -86,43 +89,14 @@ public class HttpConnection extends AbstractConnection {
 			return true;
 		}
 
+		HttpServerHeader sh = null;
+
 		HttpClientHeader h = HttpClientHeader.parse(getSocket().getInputStream());
 		if(h == null) return false;
 
-		HttpServerHeader sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
-		HttpRequestContext ctx = new HttpRequestContext(this, h, sh);
-		HttpRequestContext.setCurrentContext(ctx);
+		if(sh == null) sh = createResponse(h);
 
-		HttpDocument d = getServer().getDocumentProvider().getDocument(h.getPath().getDocumentPath());
-		if(d == null) d = getServer().getDocumentProvider().get404Document();
-
-		try {
-			try {
-				d.createContent();
-
-				sh = ctx.getServerHeader();
-			}catch(HttpResponseException e) {
-				sh = new HttpServerHeader(getServer().getProtocolVersion(), e.getStatusCode(), new HttpHeaderFields());
-				String statusMessage = e.getStatusMessage();
-				if(statusMessage == null) statusMessage = "Error " + e.getStatusCode().getStatusCode();
-				sh.setContent("text/plain", statusMessage.getBytes(StandardCharsets.UTF_8));
-			}
-
-			if(sh.isAllowByteRanges()) applyRanges(sh);
-			if(sh.isCompressionEnabled()) applyCompression(sh);
-		}catch(Exception e) {
-			getServer().getLogger().error("Error while creating page content", e);
-
-			// Reset all of the context-related fields to ensure a clean environment
-			sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
-			ctx = new HttpRequestContext(this, h, sh);
-			HttpRequestContext.setCurrentContext(ctx);
-			ctx.setException(e);
-
-			getServer().getDocumentProvider().get500Document().createContent();
-		}
-
-		boolean keepAlive = !"close".equalsIgnoreCase(h.getFields().getFirst("Connection"));
+		boolean keepAlive = h != null && !"close".equalsIgnoreCase(h.getFields().getFirst("Connection"));
 		if(keepAlive && !sh.getFields().has("Connection")) sh.getFields().set("Connection", "keep-alive");
 
 		InputStream sIn = getSocket().getInputStream();
@@ -145,7 +119,51 @@ public class HttpConnection extends AbstractConnection {
 
 		sOut.flush();
 
+		HttpRequestContext.setCurrentContext(null);
+
 		return keepAlive || websocketConnection != null;
+	}
+
+	private HttpServerHeader createResponse(HttpClientHeader h) {
+		HttpServerHeader sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
+		HttpRequestContext ctx = new HttpRequestContext(this, h, sh);
+		HttpRequestContext.setCurrentContext(ctx);
+
+		HttpDocument d = getServer().getDocumentProvider().get(h.getMethod(), h.getPath().getDocumentPath());
+		if(d == null) d = getServer().getDocumentProvider().getNotFoundDocument();
+
+		try {
+			try {
+				d.createContent();
+
+				sh = ctx.getServerHeader();
+			}catch(HttpResponseException e) {
+				sh = createResponseFromException(e);
+			}
+
+			if(sh.isAllowByteRanges()) applyRanges(sh);
+			if(sh.isCompressionEnabled()) applyCompression(sh);
+		}catch(Exception e) {
+			getServer().getLogger().error("Error while creating page content", e);
+
+			// Reset all of the context-related fields to ensure a clean environment
+			sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
+			ctx = new HttpRequestContext(this, h, sh);
+			HttpRequestContext.setCurrentContext(ctx);
+			ctx.setException(e);
+
+			getServer().getDocumentProvider().getErrorDocument().createContent();
+		}
+
+		return sh;
+	}
+
+	private HttpServerHeader createResponseFromException(HttpResponseException exception) {
+		HttpServerHeader sh = new HttpServerHeader(getServer().getProtocolVersion(), exception.getStatusCode(), new HttpHeaderFields());
+		String statusMessage = exception.getStatusMessage();
+		if(statusMessage == null) statusMessage = "Error " + exception.getStatusCode().getStatusCode();
+		sh.setContent(MimeType.TEXT, statusMessage.getBytes(StandardCharsets.UTF_8));
+		return sh;
 	}
 
 	private void applyRanges(HttpServerHeader sh) {
@@ -176,14 +194,14 @@ public class HttpConnection extends AbstractConnection {
 						sh.setContentLength(endOff);
 					}else {
 						sh.setStatusCode(HttpStatusCodes.BAD_REQUEST_400);
-						sh.setContent("text/html", "<h1>400 Bad Request</h1>".getBytes(StandardCharsets.UTF_8));
+						sh.setContent(MimeType.HTML, "<h1>400 Bad Request</h1>".getBytes(StandardCharsets.UTF_8));
 						return;
 					}
 					sh.setStatusCode(HttpStatusCodes.PARTIAL_CONTENT_206);
 					sh.getFields().set("Content-Range", "bytes " + sh.getContentOffset() + "-" + (sh.getContentOffset() + sh.getContentLength() - 1) + "/" + sh.getTotalContentLength());
 				}catch(NumberFormatException | FriendlyException e) {
 					sh.setStatusCode(HttpStatusCodes.REQUESTED_RANGE_NOT_SATISFIABLE_416);
-					sh.setContent("text/html", "<h1>416 Requested Range Not Satisfiable</h1>".getBytes(StandardCharsets.UTF_8));
+					sh.setContent(MimeType.HTML, "<h1>416 Requested Range Not Satisfiable</h1>".getBytes(StandardCharsets.UTF_8));
 				}
 			}
 		}

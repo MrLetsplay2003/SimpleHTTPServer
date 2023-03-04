@@ -6,11 +6,11 @@ import me.mrletsplay.simplehttpserver.http.HttpStatusCodes;
 import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
 
-public class Default500Document implements HttpDocument {
+public class DefaultErrorDocument implements HttpDocument {
 
 	private HtmlDocument doc;
 
-	public Default500Document() {
+	public DefaultErrorDocument() {
 		this.doc = new HtmlDocument();
 		doc.setTitle("500 Internal Server Error");
 		doc.setDescription("500 Page");

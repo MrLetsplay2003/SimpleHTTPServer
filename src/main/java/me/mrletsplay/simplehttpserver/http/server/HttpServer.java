@@ -1,18 +1,21 @@
-package me.mrletsplay.simplehttpserver.http;
+package me.mrletsplay.simplehttpserver.http.server;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import me.mrletsplay.simplehttpserver.http.HttpProtocolVersion;
+import me.mrletsplay.simplehttpserver.http.HttpProtocolVersions;
 import me.mrletsplay.simplehttpserver.http.compression.DeflateCompression;
-import me.mrletsplay.simplehttpserver.http.compression.GZIPCompression;
+import me.mrletsplay.simplehttpserver.http.compression.GzipCompression;
 import me.mrletsplay.simplehttpserver.http.compression.HttpCompressionMethod;
 import me.mrletsplay.simplehttpserver.http.document.DefaultDocumentProvider;
-import me.mrletsplay.simplehttpserver.http.document.HttpDocumentProvider;
+import me.mrletsplay.simplehttpserver.http.document.DocumentProvider;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnectionAcceptor;
 import me.mrletsplay.simplehttpserver.server.impl.AbstractServer;
 
 public class HttpServer extends AbstractServer {
 
-	private HttpDocumentProvider documentProvider;
+	private DocumentProvider documentProvider;
 	private HttpProtocolVersion protocolVersion;
 	private List<HttpCompressionMethod> compressionMethods;
 
@@ -23,7 +26,7 @@ public class HttpServer extends AbstractServer {
 		setConnectionAcceptor(new HttpConnectionAcceptor(this));
 		setDocumentProvider(new DefaultDocumentProvider());
 		addCompressionMethod(new DeflateCompression());
-		addCompressionMethod(new GZIPCompression());
+		addCompressionMethod(new GzipCompression());
 	}
 
 	@Deprecated
@@ -47,12 +50,12 @@ public class HttpServer extends AbstractServer {
 		return (HttpServerConfiguration) super.getConfiguration();
 	}
 
-	public void setDocumentProvider(HttpDocumentProvider documentProvider) throws IllegalStateException {
+	public void setDocumentProvider(DocumentProvider documentProvider) throws IllegalStateException {
 		if(isRunning()) throw new IllegalStateException("Server is running");
 		this.documentProvider = documentProvider;
 	}
 
-	public HttpDocumentProvider getDocumentProvider() {
+	public DocumentProvider getDocumentProvider() {
 		return documentProvider;
 	}
 

@@ -1,4 +1,4 @@
-package me.mrletsplay.simplehttpserver.http;
+package me.mrletsplay.simplehttpserver.http.server;
 
 import java.io.File;
 

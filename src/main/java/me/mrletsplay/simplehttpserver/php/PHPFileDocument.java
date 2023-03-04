@@ -12,29 +12,31 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import me.mrletsplay.mrcore.io.IOUtils;
+import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
 import me.mrletsplay.simplehttpserver.http.HttpStatusCode;
 import me.mrletsplay.simplehttpserver.http.document.HttpDocument;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
+import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
 public class PHPFileDocument implements HttpDocument {
 
 	private File file;
-	private String fallbackMimeType;
+	private MimeType fallbackMimeType;
 
-	public PHPFileDocument(File file, String fallbackMimeType) {
+	public PHPFileDocument(File file, MimeType fallbackMimeType) {
 		this.file = file;
 		this.fallbackMimeType = fallbackMimeType;
 	}
 
 	public PHPFileDocument(File file) {
-		this(file, "text/html");
+		this(file, MimeType.HTML);
 	}
 
 	@Override
 	public void createContent() {
 		HttpRequestContext c = HttpRequestContext.getCurrentContext();
 		if(!PHP.isEnabled()) {
-			c.getServerHeader().setContent("text/plain", "PHP is disabled".getBytes(StandardCharsets.UTF_8));
+			c.getServerHeader().setContent(MimeType.TEXT, "PHP is disabled".getBytes(StandardCharsets.UTF_8));
 			return;
 		}
 
@@ -46,12 +48,12 @@ public class PHPFileDocument implements HttpDocument {
 
 		Map<String, String> env = b.environment();
 		env.put("REDIRECT_STATUS", "CGI");
-		env.put("REQUEST_METHOD", c.getClientHeader().getMethod());
+		env.put("REQUEST_METHOD", c.getClientHeader().getMethod().name());
 		env.put("SCRIPT_NAME", c.getClientHeader().getPath().getDocumentPath());
 		env.put("SCRIPT_FILENAME", file.toPath().toAbsolutePath().normalize().toString());
 		env.put("REQUEST_URI", c.getClientHeader().getPath().getDocumentPath());
 		env.put("QUERY_STRING", c.getClientHeader().getPath().getQuery().toString());
-		if(c.getClientHeader().getMethod().equals("POST")
+		if(c.getClientHeader().getMethod() == HttpRequestMethod.POST
 				&& !c.getClientHeader().getFields().getAll("Content-Type").isEmpty()) {
 				env.put("CONTENT_TYPE", c.getClientHeader().getFields().getFirst("Content-Type"));
 		}

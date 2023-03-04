@@ -1,9 +1,10 @@
-package me.mrletsplay.simplehttpserver.http;
+package me.mrletsplay.simplehttpserver.http.server.connection;
 
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
+import me.mrletsplay.simplehttpserver.http.server.HttpServer;
 import me.mrletsplay.simplehttpserver.server.connection.Connection;
 import me.mrletsplay.simplehttpserver.server.connection.ConnectionAcceptor;
 

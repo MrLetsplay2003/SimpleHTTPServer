@@ -10,7 +10,7 @@ import me.mrletsplay.mrcore.json.JSONArray;
 import me.mrletsplay.mrcore.json.JSONObject;
 import me.mrletsplay.mrcore.json.JSONParser;
 import me.mrletsplay.simplehttpserver.http.request.multipart.Multipart;
-import me.mrletsplay.simplehttpserver.http.request.urlencoded.URLEncoded;
+import me.mrletsplay.simplehttpserver.http.request.urlencoded.UrlEncoded;
 
 public class DefaultClientContentTypes<T> implements HttpClientContentType<T> {
 
@@ -20,7 +20,7 @@ public class DefaultClientContentTypes<T> implements HttpClientContentType<T> {
 	public static final DefaultClientContentTypes<JSONObject> JSON_OBJECT = new DefaultClientContentTypes<>((h, c) -> new JSONObject(new String(c, StandardCharsets.UTF_8)), "application/json");
 	public static final DefaultClientContentTypes<JSONArray> JSON_ARRAY = new DefaultClientContentTypes<>((h, c) -> new JSONArray(new String(c, StandardCharsets.UTF_8)), "application/json");
 	public static final DefaultClientContentTypes<String> TEXT = new DefaultClientContentTypes<>((h, c) -> new String(c, StandardCharsets.UTF_8), "text/plain");
-	public static final DefaultClientContentTypes<URLEncoded> URLENCODED = new DefaultClientContentTypes<>((h, c) -> URLEncoded.parse(c), "application/x-www-form-urlencoded");
+	public static final DefaultClientContentTypes<UrlEncoded> URLENCODED = new DefaultClientContentTypes<>((h, c) -> UrlEncoded.parse(c), "application/x-www-form-urlencoded");
 	public static final DefaultClientContentTypes<Multipart> MULTIPART = new DefaultClientContentTypes<>((h, c) -> Multipart.parse(h, c), "multipart/form-data", "multipart/mixed");
 	public static final DefaultClientContentTypes<byte[]> OCTET_STREAM = new DefaultClientContentTypes<>((h, c) -> c, "application/octet-stream");
 

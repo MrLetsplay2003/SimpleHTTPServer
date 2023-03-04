@@ -12,15 +12,15 @@ import java.util.stream.Collectors;
 
 import me.mrletsplay.mrcore.http.HttpUtils;
 
-public class URLEncoded {
+public class UrlEncoded {
 
 	private Map<String, List<String>> data;
 
-	public URLEncoded(Map<String, List<String>> map) {
+	public UrlEncoded(Map<String, List<String>> map) {
 		this.data = new LinkedHashMap<>(map);
 	}
 
-	public URLEncoded() {
+	public UrlEncoded() {
 		this.data = new LinkedHashMap<>();
 	}
 
@@ -72,7 +72,7 @@ public class URLEncoded {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		URLEncoded other = (URLEncoded) obj;
+		UrlEncoded other = (UrlEncoded) obj;
 		if (data == null) {
 			if (other.data != null)
 				return false;
@@ -90,19 +90,24 @@ public class URLEncoded {
 			.collect(Collectors.joining("&"));
 	}
 
-	public static URLEncoded parse(String urlEncoded) {
+	public static UrlEncoded parse(String urlEncoded) {
 		Map<String, List<String>> queryParameters = new HashMap<>();
 		for(String st : urlEncoded.split("&")) {
 			String[] kv = st.split("=", 2);
-			String key = HttpUtils.urlDecode(kv[0]);
-			List<String> vs = queryParameters.getOrDefault(key, new ArrayList<>());
-			vs.add(kv.length == 2 ? HttpUtils.urlDecode(kv[1]) : "");
-			queryParameters.put(key, vs);
+
+			try {
+				String key = HttpUtils.urlDecode(kv[0]);
+				List<String> vs = queryParameters.getOrDefault(key, new ArrayList<>());
+				vs.add(kv.length == 2 ? HttpUtils.urlDecode(kv[1]) : "");
+				queryParameters.put(key, vs);
+			}catch(IllegalArgumentException e) {
+				return null;
+			}
 		}
-		return new URLEncoded(queryParameters);
+		return new UrlEncoded(queryParameters);
 	}
 
-	public static URLEncoded parse(byte[] urlEncoded) {
+	public static UrlEncoded parse(byte[] urlEncoded) {
 		return parse(new String(urlEncoded, StandardCharsets.UTF_8));
 	}
 
