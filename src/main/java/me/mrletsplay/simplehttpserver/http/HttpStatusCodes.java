@@ -7,6 +7,7 @@ public enum HttpStatusCodes implements HttpStatusCode {
 
 	// 200
 	OK_200(200, "OK"),
+	CREATED_201(201, "Created"),
 	NO_CONTENT_204(204, "No Content"),
 	PARTIAL_CONTENT_206(206, "Partial Content"),
 
@@ -15,6 +16,7 @@ public enum HttpStatusCodes implements HttpStatusCode {
 	FOUND_302(302, "Found"),
 	SEE_OTHER_303(303, "See Other"),
 	TEMPORARY_REDIRECT_307(307, "Temporary Redirect"),
+	PERMANENT_REDIRECT_308(308, "Permanent Redirect"),
 
 	// 400
 	BAD_REQUEST_400(400, "Bad Request"),

@@ -9,12 +9,15 @@ public class EndpointUtil {
 	private EndpointUtil() {}
 
 	/**
-	 * Tries to find an {@link Endpoint @Endpoint} annotation for a method, also searching overridden methods in superclasses.
+	 * Tries to find an {@link Endpoint @Endpoint} annotation for a method, also searching overridden methods in superclasses.<br>
+	 * If an endpoint is annotated with the {@link UnavailableEndpoint @UnavailableEndpoint} annotation, this method will return <code>null</code>, however, this annotation is not inherited to overridden methods.
 	 * @param method The method
 	 * @return The annotation or <code>null</code> if there is no method with the annotation
 	 * @throws SecurityException If the exception occurs during reflection
 	 */
 	public static Endpoint getEndpoint(Method method) throws SecurityException {
+		if(method.isAnnotationPresent(UnavailableEndpoint.class)) return null;
+
 		while(true) {
 			Endpoint endpoint = method.getAnnotation(Endpoint.class);
 			if(endpoint != null) return endpoint;
