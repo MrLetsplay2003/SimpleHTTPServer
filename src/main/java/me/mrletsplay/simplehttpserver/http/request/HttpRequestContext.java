@@ -109,7 +109,7 @@ public class HttpRequestContext {
 		serverHeader.setContent(response.getContentType(), response.getContent());
 	}
 
-	public static HttpRequestContext getCurrentContext() {
+	public static HttpRequestContext getCurrentContext() throws IllegalStateException {
 		HttpRequestContext ctx = context.get();
 		if(ctx == null) throw new IllegalStateException("No context present");
 		return ctx;

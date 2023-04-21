@@ -1,7 +1,9 @@
 package me.mrletsplay.simplehttpserver.http.document;
 
-import me.mrletsplay.simplehttpserver.http.HttpStatusCodes;
+import java.util.Set;
+
 import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
+import me.mrletsplay.simplehttpserver.http.HttpStatusCodes;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
 import me.mrletsplay.simplehttpserver.http.util.PathMatcher;
 
@@ -44,12 +46,23 @@ public interface DocumentProvider {
 
 	/**
 	 * Returns the document mapped to a specific path.<br>
-	 * This includes both {@link #register(HttpRequestMethod, String, HttpDocument) fixed paths} and {@link #registerPattern(HttpRequestMethod, String, HttpDocument) pattern-matched paths}
-	 * @param method
-	 * @param path
-	 * @return
+	 * This includes both {@link #register(HttpRequestMethod, String, HttpDocument) fixed paths} and {@link #registerPattern(HttpRequestMethod, String, HttpDocument) pattern-matched paths}<br>
+	 * <br>
+	 * This method also initializes the {@link HttpRequestContext} with the corresponding path parameters for pattern-matched paths, if there is currently one set
+	 * @param method The request method to use
+	 * @param path The path of the document
+	 * @return A document, if there is one mapped for this path, {@code null} otherwise
+	 * @see HttpRequestContext#setCurrentContext(HttpRequestContext)
 	 */
 	public HttpDocument get(HttpRequestMethod method, String path);
+
+	/**
+	 * Returns the mapped {@link HttpRequestMethod}s associated with a path.<br>
+	 * This includes both {@link #register(HttpRequestMethod, String, HttpDocument) fixed paths} and {@link #registerPattern(HttpRequestMethod, String, HttpDocument) pattern-matched paths}
+	 * @param path The path of the document
+	 * @return The options for the path
+	 */
+	public Set<HttpRequestMethod> getOptions(String path);
 
 	/**
 	 * @param document The document to use
