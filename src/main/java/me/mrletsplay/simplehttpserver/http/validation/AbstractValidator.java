@@ -1,4 +1,4 @@
-package me.mrletsplay.simplehttpserver.http.endpoint.validation;
+package me.mrletsplay.simplehttpserver.http.validation;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -1,7 +1,10 @@
-package me.mrletsplay.simplehttpserver.http.endpoint.validation;
+package me.mrletsplay.simplehttpserver.http.validation;
 
 import java.util.List;
 import java.util.stream.Collectors;
+
+import me.mrletsplay.simplehttpserver.http.validation.result.ValidationErrors;
+import me.mrletsplay.simplehttpserver.http.validation.result.ValidationResult;
 
 public interface Validator<T> {
 
@@ -16,10 +19,10 @@ public interface Validator<T> {
 
 		if(results.stream().allMatch(r -> r.isOk())) return ValidationResult.ok();
 
-		return ValidationResult.error(results.stream()
+		return ValidationResult.error(ValidationErrors.combine(results.stream()
 			.filter(r -> !r.isOk())
-			.flatMap(r -> r.getErrors().stream())
-			.collect(Collectors.toList()));
+			.map(r -> r.getErrors())
+			.toArray(ValidationErrors[]::new)));
 	}
 
 }

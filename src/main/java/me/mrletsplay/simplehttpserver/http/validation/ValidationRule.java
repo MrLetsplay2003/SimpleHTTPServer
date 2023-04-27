@@ -1,7 +1,7 @@
-package me.mrletsplay.simplehttpserver.http.endpoint.validation;
+package me.mrletsplay.simplehttpserver.http.validation;
 
-import java.util.ArrayList;
-import java.util.List;
+import me.mrletsplay.simplehttpserver.http.validation.result.ValidationErrors;
+import me.mrletsplay.simplehttpserver.http.validation.result.ValidationResult;
 
 @FunctionalInterface
 public interface ValidationRule<T> {
@@ -22,10 +22,10 @@ public interface ValidationRule<T> {
 			ValidationResult oResult = other.validate(data);
 
 			if(result.isOk() && oResult.isOk()) return ValidationResult.ok();
+			if(result.isOk()) return oResult;
+			if(oResult.isOk()) return result;
 
-			List<String> errors = new ArrayList<>(result.getErrors());
-			errors.addAll(oResult.getErrors());
-			return ValidationResult.error(errors);
+			return ValidationResult.error(ValidationErrors.combine(result.getErrors(), oResult.getErrors()));
 		};
 	}
 
