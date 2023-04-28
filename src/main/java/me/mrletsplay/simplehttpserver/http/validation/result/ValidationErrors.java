@@ -1,13 +1,13 @@
 package me.mrletsplay.simplehttpserver.http.validation.result;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import me.mrletsplay.mrcore.json.JSONArray;
 import me.mrletsplay.mrcore.json.JSONObject;
@@ -69,13 +69,13 @@ public class ValidationErrors {
 		if(errors.length == 0) throw new IllegalArgumentException("Need at least one error");
 		if(errors.length == 1) return errors[0];
 
-		var newErrors = Stream.concat(errors[0].errors.entrySet().stream(), errors[1].errors.entrySet().stream())
+		var newErrors = Arrays.stream(errors).flatMap(e -> e.errors.entrySet().stream())
 			.collect(Collectors.toMap(
 				e -> e.getKey(),
 				e -> (List<String>) new ArrayList<>(e.getValue()),
 				(a, b) -> { a.addAll(b); return a; },
 				HashMap::new));
-		var newSubElements = Stream.concat(errors[0].subElements.entrySet().stream(), errors[1].subElements.entrySet().stream())
+		var newSubElements = Arrays.stream(errors).flatMap(e -> e.subElements.entrySet().stream())
 			.collect(Collectors.toMap(
 				e -> e.getKey(),
 				e -> e.getValue().copy(),
