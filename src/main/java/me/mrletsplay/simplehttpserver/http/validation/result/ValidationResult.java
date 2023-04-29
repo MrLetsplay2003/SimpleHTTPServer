@@ -35,6 +35,10 @@ public class ValidationResult {
 		return error(ValidationErrors.of(key, messages));
 	}
 
+	public static ValidationResult check(boolean bool, String key, String errorMessage) {
+		return bool ? ValidationResult.ok() : ValidationResult.error(key, errorMessage);
+	}
+
 	public JsonResponse asJsonResponse() {
 		if(ok) throw new IllegalStateException("Only usable if there is an error");
 		JSONObject obj = new JSONObject();

@@ -1,5 +1,7 @@
 package me.mrletsplay.simplehttpserver.http.validation;
 
+import java.util.regex.Pattern;
+
 import me.mrletsplay.mrcore.json.JSONObject;
 import me.mrletsplay.mrcore.json.JSONType;
 import me.mrletsplay.simplehttpserver.http.validation.result.ValidationErrors;
@@ -7,42 +9,70 @@ import me.mrletsplay.simplehttpserver.http.validation.result.ValidationResult;
 
 public class JsonObjectValidator extends AbstractValidator<JSONObject> {
 
+	private static final Pattern EMAIL_REGEX = Pattern.compile("^[a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[a-zA-Z0-9.-]+$");
+
+	private static ValidationRule<JSONObject> ruleRequire(String key) {
+		return o -> ValidationResult.check(o.has(key), key, "Missing attribute");
+	}
+
+	private static ValidationRule<JSONObject> ruleIsOfType(String key, JSONType type) {
+		return o -> {
+			if(!o.has(key)) return ValidationResult.ok();
+			return ValidationResult.check(o.isOfType(key, type), key, "Attribute must be of type " + type);
+		};
+	}
+
+	private static ValidationRule<JSONObject> ruleEmail(String key) {
+		return ruleIsOfType(key, JSONType.STRING).bailAnd(o -> {
+			if(!o.has(key)) return ValidationResult.ok();
+			return ValidationResult.check(EMAIL_REGEX.matcher(o.getString(key)).matches(), key, "Not an email address");
+		});
+	}
+
+	private static ValidationRule<JSONObject> ruleSubElementMatches(String key, JsonObjectValidator validator) {
+		return ruleIsOfType(key, JSONType.OBJECT).bailAnd(o -> {
+			if(!o.has(key)) return ValidationResult.ok();
+			ValidationResult result = validator.validate(o.getJSONObject(key));
+			if(result.isOk()) return result;
+			return ValidationResult.error(ValidationErrors.subElement(key, result.getErrors()));
+		});
+	}
+
 	public JsonObjectValidator require(String key) {
-		addRule(o -> o.has(key) ? ValidationResult.ok() : ValidationResult.error(key, "Missing attribute"));
+		addRule(ruleRequire(key));
 		return this;
 	}
 
 	public JsonObjectValidator require(String key, JSONType type) {
-		addRule(o -> o.isOfType(key, type) ? ValidationResult.ok() : ValidationResult.error(key, "Missing attribute of type " + type));
+		addRule(ruleRequire(key)
+			.bailAnd(ruleIsOfType(key, type)));
 		return this;
 	}
 
 	public JsonObjectValidator optional(String key, JSONType type) {
-		addRule(o -> {
-			if(!o.has(key) || o.isOfType(key, type)) return ValidationResult.ok();
-			return ValidationResult.error(key, "Attribute is not of type " + type);
-		});
+		addRule(ruleIsOfType(key, type));
+		return this;
+	}
+
+	public JsonObjectValidator requireEmail(String key) {
+		addRule(ruleRequire(key)
+			.bailAnd(ruleEmail(key)));
+		return this;
+	}
+
+	public JsonObjectValidator optionalEmail(String key) {
+		addRule(ruleEmail(key));
 		return this;
 	}
 
 	public JsonObjectValidator requireObject(String key, JsonObjectValidator validator) {
-		addRule(o -> {
-			if(!o.isOfType(key, JSONType.OBJECT)) return ValidationResult.error(key, "Missing object");
-			ValidationResult result = validator.validate(o.getJSONObject(key));
-			if(result.isOk()) return result;
-			return ValidationResult.error(ValidationErrors.subElement(key, result.getErrors()));
-		});
+		addRule(ruleRequire(key)
+			.bailAnd(ruleSubElementMatches(key, validator)));
 		return this;
 	}
 
 	public JsonObjectValidator optionalObject(String key, JsonObjectValidator validator) {
-		addRule(o -> {
-			if(!o.has(key)) return ValidationResult.ok();
-			if(!o.isOfType(key, JSONType.OBJECT)) return ValidationResult.error(key, "Attribute is not an object");
-			ValidationResult result = validator.validate(o.getJSONObject(key));
-			if(result.isOk()) return result;
-			return ValidationResult.error(ValidationErrors.subElement(key, result.getErrors()));
-		});
+		addRule(ruleSubElementMatches(key, validator));
 		return this;
 	}
 
