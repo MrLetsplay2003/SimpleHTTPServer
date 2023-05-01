@@ -1,18 +1,20 @@
 package me.mrletsplay.simplehttpserver.server.connection;
 
 import java.io.IOException;
-import java.net.Socket;
+import java.nio.channels.SocketChannel;
 
 import me.mrletsplay.simplehttpserver.server.Server;
 import me.mrletsplay.simplehttpserver.server.ServerException;
 
 public interface Connection {
 
-	public void startRecieving();
+	public void readData() throws IOException;
+
+	public void writeData() throws IOException;
 
 	public Server getServer();
 
-	public Socket getSocket();
+	public SocketChannel getSocket();
 
 	public default void close() {
 		try {
@@ -24,7 +26,7 @@ public interface Connection {
 	}
 
 	public default boolean isSocketAlive() {
-		return !getSocket().isClosed() && getSocket().isConnected() && getSocket().isBound() && !getSocket().isInputShutdown() && !getSocket().isOutputShutdown();
+		return getSocket().isConnected() || getSocket().isConnectionPending();
 	}
 
 }

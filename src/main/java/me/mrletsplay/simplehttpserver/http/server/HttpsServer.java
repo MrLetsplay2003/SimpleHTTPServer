@@ -2,15 +2,15 @@ package me.mrletsplay.simplehttpserver.http.server;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.ServerSocket;
 import java.net.UnknownHostException;
+import java.nio.channels.ServerSocketChannel;
 import java.security.GeneralSecurityException;
 
 import me.mrletsplay.mrcore.misc.FriendlyException;
 import me.mrletsplay.simplehttpserver.http.ssl.SSLCertificateSocketFactory;
 
 public class HttpsServer extends HttpServer {
-	
+
 	private SSLCertificateSocketFactory socketFactory;
 
 	public HttpsServer(HttpsServerConfiguration configuration) {
@@ -41,12 +41,13 @@ public class HttpsServer extends HttpServer {
 				.certificatePassword(certificatePassword)
 				.create());
 	}
-	
+
 	@Override
-	protected ServerSocket createSocket() throws UnknownHostException, IOException {
-		return socketFactory.createServerSocket(getConfiguration().getHost(), getConfiguration().getPort());
+	protected ServerSocketChannel createSocket() throws UnknownHostException, IOException {
+		return null; // TODO
+//		return socketFactory.createServerSocket(getConfiguration().getHost(), getConfiguration().getPort());
 	}
-	
+
 	public static HttpsServerConfiguration.Builder newConfigurationBuilder() {
 		return new HttpsServerConfiguration.Builder();
 	}

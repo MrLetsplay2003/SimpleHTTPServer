@@ -9,11 +9,13 @@ public class AbstractServerConfiguration {
 	protected String host;
 	protected int port;
 	protected Logger logger;
+	protected int poolSize;
 
-	protected AbstractServerConfiguration(String host, int port, Logger logger) {
+	protected AbstractServerConfiguration(String host, int port, Logger logger, int poolSize) {
 		this.host = host;
 		this.port = port;
 		this.logger = logger;
+		this.poolSize = poolSize;
 	}
 
 	public String getHost() {
@@ -28,11 +30,16 @@ public class AbstractServerConfiguration {
 		return logger;
 	}
 
+	public int getPoolSize() {
+		return poolSize;
+	}
+
 	public static abstract class AbstractServerConfigurationBuilder<T extends AbstractServerConfiguration, Self extends Builder<T,Self>> implements Builder<T, Self>{
 
 		protected String host;
 		protected int port;
 		protected Logger logger;
+		protected int poolSize;
 
 		protected AbstractServerConfigurationBuilder() {}
 
@@ -57,6 +64,11 @@ public class AbstractServerConfiguration {
 
 		public Self logger(Logger logger) {
 			this.logger = logger;
+			return getSelf();
+		}
+
+		public Self poolSize(int poolSize) {
+			this.poolSize = poolSize;
 			return getSelf();
 		}
 

@@ -78,7 +78,7 @@ public class HttpServerHeader {
 	public void setContent(MimeType type, InputStream content, long length, boolean forceContentType) {
 		MimeType effectiveType = type == null ? MimeType.UNKNOWN : type;
 		if(fields.getAll("Content-Type").isEmpty() || forceContentType) {
-			fields.set("Content-Type", effectiveType.toString()); // TODO: charset?
+			fields.set("Content-Type", effectiveType.toString());
 		}
 		this.content = content;
 		setContentLength(length);

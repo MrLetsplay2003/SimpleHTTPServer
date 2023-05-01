@@ -9,6 +9,7 @@ import me.mrletsplay.simplehttpserver.http.validation.result.ValidationResult;
 
 public class JsonObjectValidator extends AbstractValidator<JSONObject> {
 
+	// From https://www.baeldung.com/java-email-validation-regex (RFC 5322 regex)
 	private static final Pattern EMAIL_REGEX = Pattern.compile("^[a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[a-zA-Z0-9.-]+$");
 
 	private static ValidationRule<JSONObject> ruleRequire(String key) {

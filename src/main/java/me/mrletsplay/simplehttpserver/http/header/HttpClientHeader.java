@@ -1,12 +1,16 @@
 package me.mrletsplay.simplehttpserver.http.header;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.ReadableByteChannel;
 import java.util.Arrays;
 import java.util.Objects;
 
 import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
+import me.mrletsplay.simplehttpserver.http.header.body.DefaultRequestBody;
+import me.mrletsplay.simplehttpserver.http.header.body.HttpRequestBody;
 
 public class HttpClientHeader {
 
@@ -16,12 +20,13 @@ public class HttpClientHeader {
 	private HttpHeaderFields fields;
 	private byte[] postData;
 
-	public HttpClientHeader(HttpRequestMethod method, HttpUrlPath path, String protocolVersion, HttpHeaderFields fields, byte[] postData) {
+	private HttpRequestBody body;
+
+	public HttpClientHeader(HttpRequestMethod method, HttpUrlPath path, String protocolVersion, HttpHeaderFields fields) {
 		this.method = method;
 		this.path = path;
 		this.protocolVersion = protocolVersion;
 		this.fields = fields;
-		this.postData = postData;
 	}
 
 	public HttpRequestMethod getMethod() {
@@ -41,10 +46,31 @@ public class HttpClientHeader {
 	}
 
 	public PostData getPostData() {
+		if(!isBodyComplete()) throw new IllegalStateException("Body is not complete");
 		return new PostData(fields, postData);
 	}
 
-	public static HttpClientHeader parse(InputStream data) {
+	public void readBody(ReadableByteChannel channel) throws IOException {
+		if(isBodyComplete()) throw new IllegalStateException("Body is complete");
+
+		body.read(channel);
+
+		if(body.isComplete()) {
+			System.out.println("BODY");
+			postData = body.toByteArray();
+			body = null;
+		}
+	}
+
+	public boolean isBodyComplete() {
+		return postData != null;
+	}
+
+	public static HttpClientHeader parseHead(byte[] data, int offset, int length) {
+		return parseHead(new ByteArrayInputStream(data, offset, length));
+	}
+
+	public static HttpClientHeader parseHead(InputStream data) {
 		try {
 			String reqLine = readLine(data);
 			if(reqLine == null) return null;
@@ -62,7 +88,9 @@ public class HttpClientHeader {
 			HttpHeaderFields fields = parseHeaders(data);
 			if(fields == null) return null;
 
-			byte[] postData = new byte[0];
+			HttpClientHeader header = new HttpClientHeader(method, path, protocolVersion, fields);
+
+			HttpRequestBody body = null;
 
 			String cL = fields.getFirst("Content-Length");
 			if(cL != null) {
@@ -72,24 +100,25 @@ public class HttpClientHeader {
 				}catch(Exception e) {
 					return null;
 				}
-				postData = new byte[contLength];
-				int actualLen = data.read(postData);
-				int tries = 0;
-				while(actualLen != contLength) {
-					if(tries++ >= 10) return null; // Give up after 10 tries
-					actualLen += data.read(postData, actualLen, contLength - actualLen); // Retry reading remaining bytes until socket times out
-				}
+
+				if(contLength > 0) body = new DefaultRequestBody(contLength);
 			}
 
-			String encoding = fields.getFirst("Transfer-Encoding");
-			if(encoding != null) {
-				if(!encoding.equalsIgnoreCase("chunked")) return null; // Unsupported transfer encoding, TODO: deflate, gzip
-				if(fields.has("Trailer")) return null; // Trailers are not supported
-				postData = readChunks(data);
-				if(postData == null) return null;
+//			String encoding = fields.getFirst("Transfer-Encoding");
+//			if(encoding != null) {
+//				if(!encoding.equalsIgnoreCase("chunked")) return null; // Unsupported transfer encoding, TODO: deflate, gzip
+//				if(fields.has("Trailer")) return null; // Trailers are not supported
+//				postData = readChunks(data);
+//				if(postData == null) return null;
+//			}
+
+			if(body != null) {
+				header.body = body;
+			}else {
+				header.postData = new byte[0];
 			}
 
-			return new HttpClientHeader(method, path, protocolVersion, fields, postData);
+			return header;
 		}catch(IOException e) {
 			return null;
 		}

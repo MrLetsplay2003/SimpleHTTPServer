@@ -12,8 +12,8 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 
 	private String certificatePassword;
 
-	protected HttpsServerConfiguration(String host, int port, Logger logger, boolean debugMode, File certificateFile, File certificateKeyFile, String certificatePassword) {
-		super(host, port, logger, debugMode);
+	protected HttpsServerConfiguration(String host, int port, Logger logger, int poolSize, boolean debugMode, File certificateFile, File certificateKeyFile, String certificatePassword) {
+		super(host, port, logger, poolSize, debugMode);
 		this.certificateFile = certificateFile;
 		this.certificateKeyFile = certificateKeyFile;
 		this.certificatePassword = certificatePassword;
@@ -80,7 +80,7 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 		@Override
 		public HttpsServerConfiguration create() throws IllegalStateException {
 			verify();
-			return new HttpsServerConfiguration(host, port, logger, debugMode, certificateFile, certificateKeyFile, certificatePassword);
+			return new HttpsServerConfiguration(host, port, logger, poolSize, debugMode, certificateFile, certificateKeyFile, certificatePassword);
 		}
 
 	}

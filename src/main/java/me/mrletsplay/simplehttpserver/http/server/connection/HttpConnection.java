@@ -2,18 +2,17 @@ package me.mrletsplay.simplehttpserver.http.server.connection;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.Socket;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import javax.net.ssl.SSLSocket;
 
 import me.mrletsplay.mrcore.misc.FriendlyException;
 import me.mrletsplay.simplehttpserver.http.HttpStatusCodes;
@@ -28,44 +27,173 @@ import me.mrletsplay.simplehttpserver.http.server.HttpServer;
 import me.mrletsplay.simplehttpserver.http.util.MimeType;
 import me.mrletsplay.simplehttpserver.http.websocket.WebSocketConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
-import me.mrletsplay.simplehttpserver.server.ServerException;
 import me.mrletsplay.simplehttpserver.server.connection.AbstractConnection;
 
 public class HttpConnection extends AbstractConnection {
 
+	public static final int DEFAULT_MAX_CLIENT_HEADER_SIZE = 16384; // TODO: configurable
+	private static final byte[] END_OF_HEADER = "\r\n\r\n".getBytes(StandardCharsets.UTF_8);
+
 	private WebSocketConnection websocketConnection;
 
-	public HttpConnection(HttpServer server, Socket socket) {
+	private ByteBuffer buffer;
+	private HttpClientHeader header;
+
+	private ByteBuffer headerBuffer;
+	private ReadableByteChannel bodyChannel;
+	private HttpServerHeader response;
+
+	public HttpConnection(HttpServer server, SocketChannel socket) {
 		super(server, socket);
-		try {
-			socket.setSoTimeout(10000);
-		} catch (SocketException e) {
-			getServer().getLogger().error("Error while intializing connection", e);
-		}
+		this.buffer = ByteBuffer.allocate(DEFAULT_MAX_CLIENT_HEADER_SIZE);
 	}
 
 	public boolean isSecure() {
-		return getSocket() instanceof SSLSocket;
+//		return getSocket() instanceof SSLSocket;
+		return false; // TODO
+	}
+
+	private boolean isHeaderComplete() {
+		byte[] arr = buffer.array();
+		o: for(int i = 0; i < arr.length - END_OF_HEADER.length; i++) {
+			for(int j = 0; j < END_OF_HEADER.length; j++) {
+				if(arr[i + j] != END_OF_HEADER[j]) continue o;
+			}
+
+			return true;
+		}
+
+		return false;
 	}
 
 	@Override
-	public void startRecieving() {
-		getServer().getExecutor().submit(() -> {
-			while(isSocketAlive() && !getServer().getExecutor().isShutdown()) {
-				try {
-					if(!receive()) {
-						close();
-						return;
-					}
-				}catch(SocketTimeoutException ignored) {
-				}catch(SocketException ignored) {
-					// Client probably just disconnected
-					close();
-				}catch(Exception e) {
-					close();
-					getServer().getLogger().error("Error in client receive loop", e);
-					throw new ServerException("Error in client receive loop", e);
+	public void readData() throws IOException {
+//		if(websocketConnection != null) { TODO: websockets
+//			websocketConnection.receive();
+//			return true;
+//		}
+
+		if(header == null) {
+			if(getSocket().read(buffer) == -1) return;
+
+			if(buffer.remaining() == 0) throw new IOException("Buffer is full");
+
+			if(!isHeaderComplete()) return;
+
+			buffer.flip();
+
+			HttpClientHeader h = HttpClientHeader.parseHead(buffer.array(), 0, buffer.remaining());
+			buffer.clear();
+
+			if(h == null) {
+				close();
+				return;
+			}
+
+			System.out.println(h.getFields().getFirst("User-Agent"));
+
+			if(!h.isBodyComplete()) {
+				header = h;
+			}else {
+				processRequest(h);
+			}
+		}else {
+			header.readBody(getSocket());
+
+			if(header.isBodyComplete()) {
+				// While processing the request, we're not interested in new data or whether we can write
+				getSocket().keyFor(getServer().getSelector()).interestOps(0);
+				processRequest(header);
+				header = null;
+			}
+		}
+
+//		getServer().getExecutor().submit(() -> {
+//			while(isSocketAlive() && !getServer().getExecutor().isShutdown()) {
+//				try {
+//					if(!receive()) {
+//						close();
+//						return;
+//					}
+//				}catch(SocketTimeoutException ignored) {
+//				}catch(SocketException ignored) {
+//					// Client probably just disconnected
+//					close();
+//				}catch(Exception e) {
+//					close();
+//					getServer().getLogger().error("Error in client receive loop", e);
+//					throw new ServerException("Error in client receive loop", e);
+//				}
+//			}
+//		});
+	}
+
+	@Override
+	public void writeData() throws IOException {
+		if(headerBuffer == null) {
+			headerBuffer = ByteBuffer.wrap(response.getHeaderBytes());
+		}else if(headerBuffer.remaining() > 0) {
+			getSocket().write(headerBuffer);
+		}else {
+			if(buffer.remaining() == 0) {
+				buffer.clear();
+
+				if(bodyChannel.read(buffer) == -1) {
+					response = null;
+					bodyChannel = null;
+					headerBuffer = null;
+
+					// Response has been written, go back to waiting for a request
+					getSocket().keyFor(getServer().getSelector()).interestOps(SelectionKey.OP_READ);
+					return;
 				}
+
+				buffer.flip();
+			}
+
+			getSocket().write(buffer);
+		}
+
+
+//		boolean keepAlive = h != null && !"close".equalsIgnoreCase(h.getFields().getFirst("Connection"));
+//		if(keepAlive && !sh.getFields().has("Connection")) sh.getFields().set("Connection", "keep-alive");
+//
+//		InputStream sIn = getSocket().getInputStream();
+//		OutputStream sOut = getSocket().getOutputStream();
+//
+//		sOut.write(sh.getHeaderBytes());
+//		sOut.flush();
+//
+//		InputStream in = sh.getContent();
+//		long skipped = in.skip(sh.getContentOffset());
+//		if(skipped < sh.getContentOffset()) getServer().getLogger().warn("Could not skip to content offset (skipped " + skipped + " of " + sh.getContentOffset() + " bytes)");
+//
+//		byte[] buf = new byte[4096];
+//		int len;
+//		int tot = 0;
+//		while(sIn.available() == 0 && tot < sh.getContentLength() && (len = in.read(buf, 0, (int) Math.min(buf.length, sh.getContentLength() - tot))) > 0) {
+//			tot += len;
+//			sOut.write(buf, 0, len);
+//		}
+//
+//		sOut.flush();
+//
+//		HttpRequestContext.setCurrentContext(null);
+//
+//		return keepAlive || websocketConnection != null;
+	}
+
+	private void processRequest(HttpClientHeader request) {
+		getServer().getExecutor().submit(() -> {
+			try {
+				response = createResponse(request);
+				bodyChannel = Channels.newChannel(response.getContent());
+
+				// Now that the response is processed, we want to write it back to the client
+				getSocket().keyFor(getServer().getSelector()).interestOps(SelectionKey.OP_WRITE);
+				getServer().getSelector().wakeup();
+			} catch (Exception e) {
+				getServer().getLogger().error("Error while processing request", e);
 			}
 		});
 	}
@@ -81,47 +209,6 @@ public class HttpConnection extends AbstractConnection {
 
 	public WebSocketConnection getWebsocketConnection() {
 		return websocketConnection;
-	}
-
-	private boolean receive() throws IOException {
-		if(websocketConnection != null) {
-			websocketConnection.receive();
-			return true;
-		}
-
-		HttpServerHeader sh = null;
-
-		HttpClientHeader h = HttpClientHeader.parse(getSocket().getInputStream());
-		if(h == null) return false;
-
-		if(sh == null) sh = createResponse(h);
-
-		boolean keepAlive = h != null && !"close".equalsIgnoreCase(h.getFields().getFirst("Connection"));
-		if(keepAlive && !sh.getFields().has("Connection")) sh.getFields().set("Connection", "keep-alive");
-
-		InputStream sIn = getSocket().getInputStream();
-		OutputStream sOut = getSocket().getOutputStream();
-
-		sOut.write(sh.getHeaderBytes());
-		sOut.flush();
-
-		InputStream in = sh.getContent();
-		long skipped = in.skip(sh.getContentOffset());
-		if(skipped < sh.getContentOffset()) getServer().getLogger().warn("Could not skip to content offset (skipped " + skipped + " of " + sh.getContentOffset() + " bytes)");
-
-		byte[] buf = new byte[4096];
-		int len;
-		int tot = 0;
-		while(sIn.available() == 0 && tot < sh.getContentLength() && (len = in.read(buf, 0, (int) Math.min(buf.length, sh.getContentLength() - tot))) > 0) {
-			tot += len;
-			sOut.write(buf, 0, len);
-		}
-
-		sOut.flush();
-
-		HttpRequestContext.setCurrentContext(null);
-
-		return keepAlive || websocketConnection != null;
 	}
 
 	private HttpServerHeader createResponse(HttpClientHeader h) {

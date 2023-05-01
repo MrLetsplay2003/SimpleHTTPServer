@@ -3,6 +3,7 @@ module simplehttpserver {
 	exports me.mrletsplay.simplehttpserver.http.compression;
 	exports me.mrletsplay.simplehttpserver.http.ssl;
 	exports me.mrletsplay.simplehttpserver.http.header;
+	exports me.mrletsplay.simplehttpserver.http.header.body;
 	exports me.mrletsplay.simplehttpserver.server.impl;
 	exports me.mrletsplay.simplehttpserver.dom.html.element;
 	exports me.mrletsplay.simplehttpserver.http.request.urlencoded;
