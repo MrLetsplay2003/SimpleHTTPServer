@@ -3,8 +3,6 @@ package me.mrletsplay.simplehttpserver.http.server.connection;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
@@ -40,7 +38,7 @@ public class HttpConnection extends AbstractConnection {
 	private HttpClientHeader header;
 
 	private ByteBuffer headerBuffer;
-	private ReadableByteChannel bodyChannel;
+	private InputStream bodyStream;
 	private HttpServerHeader response;
 
 	public HttpConnection(HttpServer server, SocketChannel socket) {
@@ -67,28 +65,25 @@ public class HttpConnection extends AbstractConnection {
 	}
 
 	@Override
-	public void readData() throws IOException {
+	public boolean readData() throws IOException {
 //		if(websocketConnection != null) { TODO: websockets
 //			websocketConnection.receive();
 //			return true;
 //		}
 
 		if(header == null) {
-			if(getSocket().read(buffer) == -1) return;
+			if(getSocket().read(buffer) == -1) return false;
 
 			if(buffer.remaining() == 0) throw new IOException("Buffer is full");
 
-			if(!isHeaderComplete()) return;
+			if(!isHeaderComplete()) return true;
 
 			buffer.flip();
 
 			HttpClientHeader h = HttpClientHeader.parseHead(buffer.array(), 0, buffer.remaining());
 			buffer.clear();
 
-			if(h == null) {
-				close();
-				return;
-			}
+			if(h == null) return false;
 
 			System.out.println(h.getFields().getFirst("User-Agent"));
 
@@ -101,12 +96,12 @@ public class HttpConnection extends AbstractConnection {
 			header.readBody(getSocket());
 
 			if(header.isBodyComplete()) {
-				// While processing the request, we're not interested in new data or whether we can write
-				getSocket().keyFor(getServer().getSelector()).interestOps(0);
 				processRequest(header);
 				header = null;
 			}
 		}
+
+		return true;
 
 //		getServer().getExecutor().submit(() -> {
 //			while(isSocketAlive() && !getServer().getExecutor().isShutdown()) {
@@ -128,31 +123,43 @@ public class HttpConnection extends AbstractConnection {
 //		});
 	}
 
+	private boolean fillBuffer() throws IOException {
+		buffer.clear();
+
+		byte[] buf = new byte[buffer.remaining()]; // TODO: don't allocate here
+		int n;
+		if((n = bodyStream.read(buf)) == -1) {
+			buffer.clear();
+			response = null;
+			bodyStream = null;
+			headerBuffer = null;
+
+			// Response has been written, go back to waiting for a request
+			getSocket().keyFor(getServer().getSelector()).interestOps(SelectionKey.OP_READ);
+			return false;
+		}
+
+		buffer.put(buf, 0, n);
+		buffer.flip();
+		return true;
+	}
+
 	@Override
-	public void writeData() throws IOException {
+	public boolean writeData() throws IOException {
 		if(headerBuffer == null) {
 			headerBuffer = ByteBuffer.wrap(response.getHeaderBytes());
 		}else if(headerBuffer.remaining() > 0) {
 			getSocket().write(headerBuffer);
-		}else {
-			if(buffer.remaining() == 0) {
-				buffer.clear();
 
-				if(bodyChannel.read(buffer) == -1) {
-					response = null;
-					bodyChannel = null;
-					headerBuffer = null;
-
-					// Response has been written, go back to waiting for a request
-					getSocket().keyFor(getServer().getSelector()).interestOps(SelectionKey.OP_READ);
-					return;
-				}
-
-				buffer.flip();
+			if(headerBuffer.remaining() == 0) {
+				fillBuffer();
 			}
-
+		}else {
+			if(buffer.remaining() == 0 && !fillBuffer()) return true;
 			getSocket().write(buffer);
 		}
+
+		return true;
 
 
 //		boolean keepAlive = h != null && !"close".equalsIgnoreCase(h.getFields().getFirst("Connection"));
@@ -184,10 +191,14 @@ public class HttpConnection extends AbstractConnection {
 	}
 
 	private void processRequest(HttpClientHeader request) {
+		// While processing the request, we're not interested in new data or whether we can write
+		getSocket().keyFor(getServer().getSelector()).interestOps(0);
+
 		getServer().getExecutor().submit(() -> {
 			try {
 				response = createResponse(request);
-				bodyChannel = Channels.newChannel(response.getContent());
+				bodyStream = response.getContent();
+				bodyStream.skip(response.getContentOffset());
 
 				// Now that the response is processed, we want to write it back to the client
 				getSocket().keyFor(getServer().getSelector()).interestOps(SelectionKey.OP_WRITE);
@@ -229,7 +240,7 @@ public class HttpConnection extends AbstractConnection {
 			}
 
 			if(sh.isAllowByteRanges()) applyRanges(sh);
-			if(sh.isCompressionEnabled()) applyCompression(sh);
+//			if(sh.isCompressionEnabled()) applyCompression(sh);
 		}catch(Exception e) {
 			getServer().getLogger().error("Error while creating page content", e);
 

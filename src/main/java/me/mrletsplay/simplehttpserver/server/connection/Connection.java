@@ -8,9 +8,9 @@ import me.mrletsplay.simplehttpserver.server.ServerException;
 
 public interface Connection {
 
-	public void readData() throws IOException;
+	public boolean readData() throws IOException;
 
-	public void writeData() throws IOException;
+	public boolean writeData() throws IOException;
 
 	public Server getServer();
 
