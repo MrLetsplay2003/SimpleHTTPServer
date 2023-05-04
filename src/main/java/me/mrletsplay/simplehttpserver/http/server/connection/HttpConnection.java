@@ -55,7 +55,7 @@ public class HttpConnection extends AbstractConnection {
 
 	private boolean isHeaderComplete() {
 		byte[] arr = buffer.array();
-		o: for(int i = buffer.position(); i < buffer.position() + buffer.remaining() - END_OF_HEADER.length; i++) {
+		o: for(int i = 0; i <= buffer.position() - END_OF_HEADER.length; i++) {
 			for(int j = 0; j < END_OF_HEADER.length; j++) {
 				if(arr[i + j] != END_OF_HEADER[j]) continue o;
 			}
