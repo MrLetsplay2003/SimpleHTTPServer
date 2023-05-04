@@ -104,7 +104,7 @@ public class HttpClientHeader {
 				if(contLength > 0) body = new DefaultRequestBody(contLength);
 			}
 
-//			String encoding = fields.getFirst("Transfer-Encoding");
+//			String encoding = fields.getFirst("Transfer-Encoding"); TODO: chunked encoding
 //			if(encoding != null) {
 //				if(!encoding.equalsIgnoreCase("chunked")) return null; // Unsupported transfer encoding, TODO: deflate, gzip
 //				if(fields.has("Trailer")) return null; // Trailers are not supported
