@@ -1,5 +1,6 @@
 package me.mrletsplay.simplehttpserver.server;
 
+import java.nio.channels.Selector;
 import java.util.concurrent.ExecutorService;
 
 import org.slf4j.Logger;
@@ -24,6 +25,8 @@ public interface Server {
 	public ExecutorService getExecutor();
 
 	public Logger getLogger();
+
+	public Selector getSelector();
 
 	public void shutdown();
 

@@ -35,6 +35,7 @@ public class HttpConnection extends AbstractConnection {
 	private WebSocketConnection websocketConnection;
 
 	private ByteBuffer buffer;
+	private byte[] byteBuffer;
 	private HttpClientHeader header;
 
 	private ByteBuffer headerBuffer;
@@ -44,6 +45,7 @@ public class HttpConnection extends AbstractConnection {
 	public HttpConnection(HttpServer server, SocketChannel socket) {
 		super(server, socket);
 		this.buffer = ByteBuffer.allocate(DEFAULT_MAX_CLIENT_HEADER_SIZE);
+		this.byteBuffer = new byte[DEFAULT_MAX_CLIENT_HEADER_SIZE];
 	}
 
 	public boolean isSecure() {
@@ -85,8 +87,6 @@ public class HttpConnection extends AbstractConnection {
 
 			if(h == null) return false;
 
-			System.out.println(h.getFields().getFirst("User-Agent"));
-
 			if(!h.isBodyComplete()) {
 				header = h;
 			}else {
@@ -126,20 +126,19 @@ public class HttpConnection extends AbstractConnection {
 	private boolean fillBuffer() throws IOException {
 		buffer.clear();
 
-		byte[] buf = new byte[buffer.remaining()]; // TODO: don't allocate here
 		int n;
-		if((n = bodyStream.read(buf)) == -1) {
+		if((n = bodyStream.read(byteBuffer)) == -1) {
 			buffer.clear();
 			response = null;
 			bodyStream = null;
 			headerBuffer = null;
 
 			// Response has been written, go back to waiting for a request
-			getSocket().keyFor(getServer().getSelector()).interestOps(SelectionKey.OP_READ);
+			getSelectionKey().interestOps(SelectionKey.OP_READ);
 			return false;
 		}
 
-		buffer.put(buf, 0, n);
+		buffer.put(byteBuffer, 0, n);
 		buffer.flip();
 		return true;
 	}
@@ -192,7 +191,7 @@ public class HttpConnection extends AbstractConnection {
 
 	private void processRequest(HttpClientHeader request) {
 		// While processing the request, we're not interested in new data or whether we can write
-		getSocket().keyFor(getServer().getSelector()).interestOps(0);
+		getSelectionKey().interestOps(0);
 
 		getServer().getExecutor().submit(() -> {
 			try {
@@ -201,7 +200,7 @@ public class HttpConnection extends AbstractConnection {
 				bodyStream.skip(response.getContentOffset());
 
 				// Now that the response is processed, we want to write it back to the client
-				getSocket().keyFor(getServer().getSelector()).interestOps(SelectionKey.OP_WRITE);
+				getSelectionKey().interestOps(SelectionKey.OP_WRITE);
 				getServer().getSelector().wakeup();
 			} catch (Exception e) {
 				getServer().getLogger().error("Error while processing request", e);
@@ -240,7 +239,7 @@ public class HttpConnection extends AbstractConnection {
 			}
 
 			if(sh.isAllowByteRanges()) applyRanges(sh);
-//			if(sh.isCompressionEnabled()) applyCompression(sh);
+			if(sh.isCompressionEnabled()) applyCompression(sh);
 		}catch(Exception e) {
 			getServer().getLogger().error("Error while creating page content", e);
 

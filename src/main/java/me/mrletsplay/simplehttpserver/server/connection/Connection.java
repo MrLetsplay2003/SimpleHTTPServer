@@ -1,6 +1,7 @@
 package me.mrletsplay.simplehttpserver.server.connection;
 
 import java.io.IOException;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
 import me.mrletsplay.simplehttpserver.server.Server;
@@ -16,8 +17,11 @@ public interface Connection {
 
 	public SocketChannel getSocket();
 
+	public SelectionKey getSelectionKey();
+
 	public default void close() {
 		try {
+			getSelectionKey().cancel();
 			getSocket().close();
 			getServer().getConnectionAcceptor().remove(this);
 		} catch (IOException e) {

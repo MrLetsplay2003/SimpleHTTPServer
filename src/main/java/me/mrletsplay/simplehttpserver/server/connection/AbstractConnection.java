@@ -1,5 +1,6 @@
 package me.mrletsplay.simplehttpserver.server.connection;
 
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
 import me.mrletsplay.simplehttpserver.server.Server;
@@ -17,6 +18,11 @@ public abstract class AbstractConnection implements Connection {
 	@Override
 	public Server getServer() {
 		return server;
+	}
+
+	@Override
+	public SelectionKey getSelectionKey() {
+		return getSocket().keyFor(getServer().getSelector());
 	}
 
 	@Override

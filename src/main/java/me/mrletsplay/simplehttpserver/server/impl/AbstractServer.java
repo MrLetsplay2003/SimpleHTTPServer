@@ -77,15 +77,10 @@ public abstract class AbstractServer implements Server {
 
 			if(key.isReadable()) {
 				Connection con = (Connection) key.attachment();
-				if(!con.isSocketAlive()) {
-					key.cancel();
-					con.close();
-					continue;
-				}
 				try {
-					if(!con.readData()) {
-						key.cancel();
+					if(!con.isSocketAlive() || !con.readData()) {
 						con.close();
+						continue;
 					}
 				}catch(IOException e) {
 					getLogger().error("Client read error", e);
@@ -94,15 +89,10 @@ public abstract class AbstractServer implements Server {
 
 			if(key.isWritable()) {
 				Connection con = (Connection) key.attachment();
-				if(!con.isSocketAlive()) {
-					key.cancel();
-					con.close();
-					continue;
-				}
 				try {
-					if(!con.writeData()) {
-						key.cancel();
+					if(!con.isSocketAlive() || !con.writeData()) {
 						con.close();
+						continue;
 					}
 				}catch(IOException e) {
 					getLogger().error("Client write error", e);
@@ -120,11 +110,6 @@ public abstract class AbstractServer implements Server {
 		Connection con = acceptor.createConnection(client);
 		acceptor.accept(con);
 		return con;
-
-//		Socket s = socket.accept();
-//		if(executor.isShutdown()) return;
-//		Connection con = acceptor.createConnection(s);
-//		acceptor.accept(con);
 	}
 
 	@Override
@@ -164,6 +149,7 @@ public abstract class AbstractServer implements Server {
 		return executor;
 	}
 
+	@Override
 	public Selector getSelector() {
 		return selector;
 	}
