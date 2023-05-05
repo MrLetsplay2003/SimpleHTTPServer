@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.Arrays;
 import java.util.Objects;
@@ -50,16 +51,25 @@ public class HttpClientHeader {
 		return new PostData(fields, postData);
 	}
 
+	private void checkComplete() {
+		if(body.isComplete()) {
+			postData = body.toByteArray();
+			body = null;
+		}
+	}
+
+	public void readBody(ByteBuffer buffer) throws IOException {
+		if(isBodyComplete()) throw new IllegalStateException("Body is complete");
+
+		body.read(buffer);
+		checkComplete();
+	}
+
 	public void readBody(ReadableByteChannel channel) throws IOException {
 		if(isBodyComplete()) throw new IllegalStateException("Body is complete");
 
 		body.read(channel);
-
-		if(body.isComplete()) {
-			System.out.println("BODY");
-			postData = body.toByteArray();
-			body = null;
-		}
+		checkComplete();
 	}
 
 	public boolean isBodyComplete() {

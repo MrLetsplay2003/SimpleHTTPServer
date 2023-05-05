@@ -13,6 +13,17 @@ public class DefaultRequestBody extends HttpRequestBody {
 
 	public DefaultRequestBody(int contentLength) {
 		this.contentLength = contentLength;
+		this.data = new ByteArrayOutputStream();
+	}
+
+	@Override
+	public void read(ByteBuffer buffer) throws IOException {
+		if(complete) throw new IllegalStateException("Body is complete");
+
+		readBuffer.flip();
+		data.write(buffer.array(), buffer.position(), buffer.remaining());
+
+		if(data.size() == contentLength) complete = true;
 	}
 
 	@Override
