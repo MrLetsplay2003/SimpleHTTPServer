@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Objects;
 
 import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
+import me.mrletsplay.simplehttpserver.http.header.body.ChunkedRequestBody;
 import me.mrletsplay.simplehttpserver.http.header.body.DefaultRequestBody;
 import me.mrletsplay.simplehttpserver.http.header.body.HttpRequestBody;
 
@@ -114,13 +115,12 @@ public class HttpClientHeader {
 				if(contLength > 0) body = new DefaultRequestBody(contLength);
 			}
 
-//			String encoding = fields.getFirst("Transfer-Encoding"); TODO: chunked encoding
-//			if(encoding != null) {
-//				if(!encoding.equalsIgnoreCase("chunked")) return null; // Unsupported transfer encoding, TODO: deflate, gzip
-//				if(fields.has("Trailer")) return null; // Trailers are not supported
-//				postData = readChunks(data);
-//				if(postData == null) return null;
-//			}
+			String encoding = fields.getFirst("Transfer-Encoding");
+			if(encoding != null) {
+				if(!encoding.equalsIgnoreCase("chunked")) return null; // Unsupported transfer encoding, TODO: deflate, gzip
+				if(fields.has("Trailer")) return null; // Trailers are not supported
+				body = new ChunkedRequestBody();
+			}
 
 			if(body != null) {
 				header.body = body;

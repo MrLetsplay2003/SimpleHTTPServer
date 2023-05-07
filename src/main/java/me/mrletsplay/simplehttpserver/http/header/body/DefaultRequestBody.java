@@ -19,8 +19,8 @@ public class DefaultRequestBody extends HttpRequestBody {
 	@Override
 	public void read(ByteBuffer buffer) throws IOException {
 		if(complete) throw new IllegalStateException("Body is complete");
+		if(!buffer.hasArray()) throw new IllegalArgumentException("Buffer must be backed by an array");
 
-		readBuffer.flip();
 		data.write(buffer.array(), buffer.position(), buffer.remaining());
 
 		if(data.size() == contentLength) complete = true;
