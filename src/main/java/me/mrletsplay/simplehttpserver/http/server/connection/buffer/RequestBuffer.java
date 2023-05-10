@@ -25,7 +25,7 @@ public class RequestBuffer {
 
 	private int headerEndIndex() {
 		byte[] arr = buffer.array();
-		o: for(int i = 0; i <= buffer.position() - END_OF_HEADER.length; i++) {
+		o: for(int i = buffer.position(); i <= buffer.position() + buffer.remaining() - END_OF_HEADER.length; i++) {
 			for(int j = 0; j < END_OF_HEADER.length; j++) {
 				if(arr[i + j] != END_OF_HEADER[j]) continue o;
 			}
@@ -37,29 +37,38 @@ public class RequestBuffer {
 	}
 
 	public boolean readData() throws IOException {
-		if(header == null) {
-			if(connection.getSocket().read(buffer) == -1) return false;
+		if(buffer.remaining() == 0) throw new IOException("Buffer is full");
 
-			if(buffer.remaining() == 0) throw new IOException("Buffer is full");
+		if(connection.getSocket().read(buffer) == -1) return false;
 
-			int endIndex;
-			if((endIndex = headerEndIndex()) == -1) return true;
+		buffer.flip();
 
-			buffer.flip();
+		while(buffer.hasRemaining()) {
+			if(header == null) {
+				int endIndex;
+				if((endIndex = headerEndIndex()) == -1) break;
 
-			header = HttpClientHeader.parseHead(buffer.array(), 0, endIndex);
-			buffer.position(endIndex);
+				header = HttpClientHeader.parseHead(buffer.array(), 0, endIndex);
+				buffer.position(endIndex);
 
-			if(header == null) return false;
+				if(header == null) return false;
+			}else {
+				header.readBody(buffer);
+			}
 
-			if(!header.isBodyComplete()) header.readBody(buffer);
-
-			buffer.clear();
-		}else {
-			header.readBody(connection.getSocket());
+			if(header.isBodyComplete()) {
+				complete = true;
+				break;
+			}
 		}
 
-		if(header.isBodyComplete()) complete = true;
+		if(!buffer.hasRemaining()) {
+			buffer.clear();
+		}else {
+			// Compact and unflip buffer
+			buffer.compact();
+			buffer.position(0);
+		}
 
 		return true;
 	}

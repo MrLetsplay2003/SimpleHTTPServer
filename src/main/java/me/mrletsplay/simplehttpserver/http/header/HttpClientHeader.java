@@ -1,11 +1,9 @@
 package me.mrletsplay.simplehttpserver.http.header;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.ReadableByteChannel;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -52,25 +50,15 @@ public class HttpClientHeader {
 		return new PostData(fields, postData);
 	}
 
-	private void checkComplete() {
-		if(body.isComplete()) {
-			postData = body.toByteArray();
-			body = null;
-		}
-	}
-
 	public void readBody(ByteBuffer buffer) throws IOException {
 		if(isBodyComplete()) throw new IllegalStateException("Body is complete");
 
 		body.read(buffer);
-		checkComplete();
-	}
 
-	public void readBody(ReadableByteChannel channel) throws IOException {
-		if(isBodyComplete()) throw new IllegalStateException("Body is complete");
-
-		body.read(channel);
-		checkComplete();
+		if(body.isComplete()) {
+			postData = body.toByteArray();
+			body = null;
+		}
 	}
 
 	public boolean isBodyComplete() {
@@ -132,25 +120,6 @@ public class HttpClientHeader {
 		}catch(IOException e) {
 			return null;
 		}
-	}
-
-	public static byte[] readChunks(InputStream in) throws IOException {
-		ByteArrayOutputStream bOut = new ByteArrayOutputStream();
-
-		while(true) {
-			String lenStr = readLine(in);
-			int len = Integer.parseInt(lenStr, 16);
-			if(len == 0) break;
-			byte[] buf = new byte[len];
-			if(in.read(buf) != len) return null;
-			bOut.write(buf);
-			if(in.read() != '\r') return null;
-			if(in.read() != '\n') return null;
-		}
-
-		if(in.read() != '\r') return null;
-		if(in.read() != '\n') return null;
-		return bOut.toByteArray();
 	}
 
 	public static HttpHeaderFields parseHeaders(InputStream in) throws IOException {
