@@ -63,6 +63,8 @@ public class HttpConnection extends AbstractConnection {
 //			return true;
 //		}
 
+		// TODO: properly handle HttpResponseException
+
 		if(!requestBuffer.readData()) return false;
 
 		if(requestBuffer.isComplete()) {
@@ -119,15 +121,21 @@ public class HttpConnection extends AbstractConnection {
 
 		getServer().getExecutor().submit(() -> {
 			try {
-				response = createResponse(request);
+				try {
+					response = createResponse(request);
+				} catch(HttpResponseException e) {
+					response = createResponseFromException(e);
+				}
+
 				bodyStream = response.getContent();
 				bodyStream.skip(response.getContentOffset());
 
 				// Now that the response is processed, we want to write it back to the client
 				getSelectionKey().interestOps(SelectionKey.OP_WRITE);
 				getServer().getSelector().wakeup();
-			} catch (Exception e) {
+			} catch(Exception e) {
 				getServer().getLogger().error("Error while processing request", e);
+				close();
 			}
 		});
 	}

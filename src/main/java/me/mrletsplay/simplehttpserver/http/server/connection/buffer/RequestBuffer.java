@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
+import me.mrletsplay.simplehttpserver.http.exception.HttpBadRequestException;
 import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
 
@@ -44,14 +45,16 @@ public class RequestBuffer {
 		buffer.flip();
 
 		while(buffer.hasRemaining()) {
+			int before = buffer.position();
+
 			if(header == null) {
 				int endIndex;
-				if((endIndex = headerEndIndex()) == -1) break;
+				if((endIndex = headerEndIndex()) == -1) return true;
 
 				header = HttpClientHeader.parseHead(buffer.array(), 0, endIndex);
 				buffer.position(endIndex);
 
-				if(header == null) return false;
+				if(header == null) throw new HttpBadRequestException("Malformed request");
 			}else {
 				header.readBody(buffer);
 			}
@@ -60,15 +63,11 @@ public class RequestBuffer {
 				complete = true;
 				break;
 			}
+
+			if(buffer.position() == before) break; // Nothing has been read this cycle, wait for more data from client
 		}
 
-		if(!buffer.hasRemaining()) {
-			buffer.clear();
-		}else {
-			// Compact and unflip buffer
-			buffer.compact();
-			buffer.position(0);
-		}
+		buffer.compact();
 
 		return true;
 	}

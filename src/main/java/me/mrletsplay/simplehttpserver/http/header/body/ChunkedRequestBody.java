@@ -5,13 +5,17 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
+import me.mrletsplay.simplehttpserver.http.exception.HttpBadRequestException;
+
 public class ChunkedRequestBody extends HttpRequestBody {
 
 	private static final byte[] CRLF = "\r\n".getBytes(StandardCharsets.UTF_8);
 
 	private ByteArrayOutputStream data;
 
-	private int remainingChunkSize = -1;
+	private int remainingChunkSize;
+	private boolean crlf;
+	private boolean finalChunk;
 
 	public ChunkedRequestBody() {
 		this.data = new ByteArrayOutputStream();
@@ -32,33 +36,40 @@ public class ChunkedRequestBody extends HttpRequestBody {
 
 	private boolean check(ByteBuffer buffer) {
 		int endIdx = chunkSizeEndIndex(buffer);
-		if(endIdx == -1) return true;
+		if(endIdx == -1) return false;
 
-		String str = new String(buffer.array(), buffer.position(), endIdx - CRLF.length);
+		String str = new String(buffer.array(), buffer.position(), endIdx - buffer.position() - CRLF.length);
+		buffer.position(endIdx);
+
 		try {
 			remainingChunkSize = Integer.parseInt(str, 16);
+			crlf = true;
 			if(remainingChunkSize == 0) {
 				// TODO: read trailing headers
-				// FIXME: read \r\n
-				complete = true;
-				return true;
+				finalChunk = true;
 			}
 		}catch(NumberFormatException e) {
-			return false;
+			throw new HttpBadRequestException("Bad chunk size");
 		}
 
-		buffer.position(endIdx);
 		readChunkData(buffer);
 
 		return true;
 	}
 
 	private void readChunkData(ByteBuffer buffer) {
-		int toRead = Math.min(remainingChunkSize, buffer.remaining());
-		data.write(buffer.array(), buffer.position(), toRead);
-		buffer.position(buffer.position() + toRead);
-		remainingChunkSize -= toRead;
-		if(remainingChunkSize == -1) remainingChunkSize = -1;
+		if(remainingChunkSize > 0) {
+			int toRead = Math.min(remainingChunkSize, buffer.remaining());
+			data.write(buffer.array(), buffer.position(), toRead);
+			buffer.position(buffer.position() + toRead);
+			remainingChunkSize -= toRead;
+		}else if(crlf) {
+			if(buffer.remaining() < CRLF.length) return;
+			if(buffer.get() != '\r') throw new RuntimeException("Not CR");
+			if(buffer.get() != '\n') throw new RuntimeException("Not LF");
+			crlf = false;
+			if(finalChunk) complete = true;
+		}
 	}
 
 	@Override
@@ -66,31 +77,15 @@ public class ChunkedRequestBody extends HttpRequestBody {
 		if(complete) throw new IllegalStateException("Body is complete");
 		if(!buffer.hasArray()) throw new IllegalArgumentException("Buffer must be backed by an array");
 
-		while(buffer.hasRemaining()) {
-			if(remainingChunkSize == -1) {
-				if(!check(buffer)) {
-					// TODO: fail
-					return;
-				}
+		if(remainingChunkSize == 0 && !crlf) {
+			if(!check(buffer)) return;
+			if(complete) return;
+		}
 
-				if(complete) return;
-			}
-
-			if(remainingChunkSize != -1) {
-				readChunkData(buffer);
-			}
+		if(remainingChunkSize != 0 || crlf) {
+			readChunkData(buffer);
 		}
 	}
-
-//	@Override
-//	public void read(ReadableByteChannel channel) throws IOException {
-//		if(complete) throw new IllegalStateException("Body is complete");
-//
-//		if(channel.read(readBuffer) == -1) return;
-//
-//		readBuffer.flip();
-//		readData();
-//	}
 
 	@Override
 	public byte[] toByteArray() {
