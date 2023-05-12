@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Objects;
 
 import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
+import me.mrletsplay.simplehttpserver.http.exception.HttpBadRequestException;
 import me.mrletsplay.simplehttpserver.http.header.body.ChunkedRequestBody;
 import me.mrletsplay.simplehttpserver.http.header.body.DefaultRequestBody;
 import me.mrletsplay.simplehttpserver.http.header.body.HttpRequestBody;
@@ -128,6 +129,7 @@ public class HttpClientHeader {
 		while((l = readLine(in)) != null && !l.isEmpty()) {
 			if(l.isEmpty()) break;
 			String[] kv = l.split(": ", 2);
+			if(kv.length != 2) throw new HttpBadRequestException();
 			fields.add(kv[0], kv[1]);
 		}
 		if(l == null) {

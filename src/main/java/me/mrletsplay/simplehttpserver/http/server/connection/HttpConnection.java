@@ -42,6 +42,7 @@ public class HttpConnection extends AbstractConnection {
 	private ByteBuffer headerBuffer;
 	private InputStream bodyStream;
 	private HttpServerHeader response;
+	private boolean closeAfterWrite;
 
 	public HttpConnection(HttpServer server, SocketChannel socket) {
 		super(server, socket);
@@ -63,9 +64,13 @@ public class HttpConnection extends AbstractConnection {
 //			return true;
 //		}
 
-		// TODO: properly handle HttpResponseException
-
-		if(!requestBuffer.readData()) return false;
+		try {
+			if(!requestBuffer.readData()) return false;
+		}catch(HttpResponseException e) {
+			respondNow(createResponseFromException(e));
+			closeAfterWrite = true;
+			return true;
+		}
 
 		if(requestBuffer.isComplete()) {
 			processRequest(requestBuffer.getHeader());
@@ -85,8 +90,6 @@ public class HttpConnection extends AbstractConnection {
 			bodyStream = null;
 			headerBuffer = null;
 
-			// Response has been written, go back to waiting for a request
-			getSelectionKey().interestOps(SelectionKey.OP_READ);
 			return false;
 		}
 
@@ -106,11 +109,15 @@ public class HttpConnection extends AbstractConnection {
 				fillBuffer();
 			}
 		}else {
-			if(buffer.remaining() == 0 && !fillBuffer()) return true;
+			if(buffer.remaining() == 0 && !fillBuffer()) {
+				if(closeAfterWrite) return false;
+
+				// Response has been written, go back to waiting for a request
+				getSelectionKey().interestOps(SelectionKey.OP_READ);
+				return true;
+			}
 			getSocket().write(buffer);
 		}
-
-		// TODO: close connection after request if not keep-alive
 
 		return true;
 	}
@@ -121,23 +128,34 @@ public class HttpConnection extends AbstractConnection {
 
 		getServer().getExecutor().submit(() -> {
 			try {
+				HttpServerHeader response;
+
 				try {
 					response = createResponse(request);
 				} catch(HttpResponseException e) {
 					response = createResponseFromException(e);
 				}
 
-				bodyStream = response.getContent();
-				bodyStream.skip(response.getContentOffset());
+				boolean keepAlive = !"close".equalsIgnoreCase(request.getFields().getFirst("Connection"));
+				if(keepAlive && !response.getFields().has("Connection")) response.getFields().set("Connection", "keep-alive");
+				closeAfterWrite = !keepAlive;
 
-				// Now that the response is processed, we want to write it back to the client
-				getSelectionKey().interestOps(SelectionKey.OP_WRITE);
-				getServer().getSelector().wakeup();
+				respondNow(response);
 			} catch(Exception e) {
 				getServer().getLogger().error("Error while processing request", e);
 				close();
 			}
 		});
+	}
+
+	private void respondNow(HttpServerHeader response) throws IOException {
+		this.response = response;
+		this.bodyStream = response.getContent();
+		this.bodyStream.skip(response.getContentOffset());
+
+		// Write the response back to the client
+		getSelectionKey().interestOps(SelectionKey.OP_WRITE);
+		getServer().getSelector().wakeup();
 	}
 
 	@Override

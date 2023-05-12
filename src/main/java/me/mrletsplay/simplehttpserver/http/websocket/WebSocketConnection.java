@@ -43,6 +43,14 @@ public class WebSocketConnection {
 		return (T) attachment;
 	}
 
+	public boolean readData() throws IOException {
+		return true;
+	}
+
+	public boolean writeData() {
+		return true;
+	}
+
 	public void send(WebSocketFrame frame) {
 //		if(closed) throw new WebSocketException("Connection is closed");
 //		try {

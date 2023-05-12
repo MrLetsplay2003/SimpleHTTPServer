@@ -164,6 +164,7 @@ public abstract class AbstractServer implements Server {
 			}catch(InterruptedException e) {
 				throw new ServerException("Error while stopping executor", e);
 			}
+			if(selector != null) selector.close();
 			if(socket != null) socket.close();
 		} catch (IOException e) {
 			throw new ServerException("Error while stopping server", e);

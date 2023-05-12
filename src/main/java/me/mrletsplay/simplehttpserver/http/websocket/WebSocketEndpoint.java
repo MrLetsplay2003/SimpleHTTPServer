@@ -57,7 +57,7 @@ public abstract class WebSocketEndpoint implements HttpDocument {
 //		String protocols = clientFields.getFieldValue("Sec-WebSocket-Protocol");
 //		String extensions = clientFields.getFieldValue("Sec-WebSocket-Extensions");
 
-		if(!version.equals("13")) {
+		if(!"13".equals(version)) {
 			sH.setStatusCode(HttpStatusCodes.BAD_REQUEST_400);
 			sH.getFields().set("Sec-WebSocket-Version", "13");
 			sH.setContent(MimeType.TEXT, "400 Bad Request".getBytes(StandardCharsets.UTF_8));
