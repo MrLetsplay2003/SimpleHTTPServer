@@ -14,6 +14,10 @@ public interface Connection {
 
 	public Socket getSocket();
 
+	public void setDead();
+
+	public boolean isDead();
+
 	public default void close() {
 		try {
 			getSocket().close();
@@ -24,7 +28,7 @@ public interface Connection {
 	}
 
 	public default boolean isSocketAlive() {
-		return !getSocket().isClosed() && getSocket().isConnected() && getSocket().isBound() && !getSocket().isInputShutdown() && !getSocket().isOutputShutdown();
+		return !isDead() && !getSocket().isClosed() && getSocket().isConnected() && getSocket().isBound() && !getSocket().isInputShutdown() && !getSocket().isOutputShutdown();
 	}
 
 }
