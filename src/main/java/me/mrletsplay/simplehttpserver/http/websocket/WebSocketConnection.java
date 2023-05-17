@@ -66,9 +66,14 @@ public class WebSocketConnection {
 	}
 
 	public void forceClose() {
+		forceClose(null);
+	}
+
+	private void forceClose(CloseFrame frame) {
 		endpoint.getConnections().remove(this);
 		closed = true;
 		httpConnection.close();
+		endpoint.onClose(this, frame);
 	}
 
 	public void sendCloseFrame(int code, String reason) {
@@ -106,8 +111,7 @@ public class WebSocketConnection {
 			switch(frame.getOpCode()) {
 				case CONNECTION_CLOSE:
 					if(hasSentCloseFrame) {
-						forceClose();
-						endpoint.onClose(this, (CloseFrame) frame);
+						forceClose((CloseFrame) frame);
 						return;
 					}
 
