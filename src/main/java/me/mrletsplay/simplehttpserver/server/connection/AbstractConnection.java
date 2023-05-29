@@ -9,6 +9,7 @@ public abstract class AbstractConnection implements Connection {
 
 	private Server server;
 	private SocketChannel socket;
+	private boolean dead;
 
 	public AbstractConnection(Server server, SocketChannel socket) {
 		this.server = server;
@@ -28,6 +29,16 @@ public abstract class AbstractConnection implements Connection {
 	@Override
 	public SocketChannel getSocket() {
 		return socket;
+	}
+
+	@Override
+	public void setDead() {
+		this.dead = true;
+	}
+
+	@Override
+	public boolean isDead() {
+		return dead;
 	}
 
 }

@@ -19,6 +19,10 @@ public interface Connection {
 
 	public SelectionKey getSelectionKey();
 
+	public void setDead();
+
+	public boolean isDead();
+
 	public default void close() {
 		try {
 			getSelectionKey().cancel();
