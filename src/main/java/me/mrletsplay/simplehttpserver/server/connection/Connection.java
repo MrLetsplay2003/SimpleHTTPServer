@@ -9,9 +9,9 @@ import me.mrletsplay.simplehttpserver.server.ServerException;
 
 public interface Connection {
 
-	public boolean readData() throws IOException;
+	public void readData() throws IOException;
 
-	public boolean writeData() throws IOException;
+	public void writeData() throws IOException;
 
 	public Server getServer();
 
@@ -34,7 +34,7 @@ public interface Connection {
 	}
 
 	public default boolean isSocketAlive() {
-		return isDead() && getSocket().isConnected() || getSocket().isConnectionPending();
+		return !isDead() && getSocket().isConnected() || getSocket().isConnectionPending();
 	}
 
 }

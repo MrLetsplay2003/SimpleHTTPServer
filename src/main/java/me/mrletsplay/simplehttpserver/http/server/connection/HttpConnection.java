@@ -23,9 +23,11 @@ import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
 import me.mrletsplay.simplehttpserver.http.server.HttpServer;
 import me.mrletsplay.simplehttpserver.http.server.connection.buffer.RequestBuffer;
+import me.mrletsplay.simplehttpserver.http.server.connection.buffer.ResponseBuffer;
 import me.mrletsplay.simplehttpserver.http.util.MimeType;
 import me.mrletsplay.simplehttpserver.http.websocket.WebSocketConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
+import me.mrletsplay.simplehttpserver.http.websocket.frame.InvalidFrameException;
 import me.mrletsplay.simplehttpserver.server.connection.AbstractConnection;
 
 public class HttpConnection extends AbstractConnection {
@@ -35,21 +37,18 @@ public class HttpConnection extends AbstractConnection {
 	private WebSocketConnection websocketConnection;
 
 	private RequestBuffer requestBuffer;
+	private ResponseBuffer responseBuffer;
 
-	private ByteBuffer buffer;
-	private byte[] byteBuffer;
+	private ByteBuffer readBuffer;
 
-	private ByteBuffer headerBuffer;
-	private InputStream bodyStream;
-	private HttpServerHeader response;
 	private boolean closeAfterWrite;
 
 	public HttpConnection(HttpServer server, SocketChannel socket) {
 		super(server, socket);
-		this.buffer = ByteBuffer.allocate(DEFAULT_MAX_CLIENT_HEADER_SIZE);
-		this.byteBuffer = new byte[DEFAULT_MAX_CLIENT_HEADER_SIZE];
 
-		this.requestBuffer = new RequestBuffer(this);
+		this.requestBuffer = new RequestBuffer();
+		this.responseBuffer = new ResponseBuffer();
+		this.readBuffer = ByteBuffer.allocate(DEFAULT_MAX_CLIENT_HEADER_SIZE);
 	}
 
 	public boolean isSecure() {
@@ -58,68 +57,67 @@ public class HttpConnection extends AbstractConnection {
 	}
 
 	@Override
-	public boolean readData() throws IOException {
-//		if(websocketConnection != null) { TODO: websockets
-//			websocketConnection.receive();
-//			return true;
-//		}
-
-		try {
-			if(!requestBuffer.readData()) return false;
-		}catch(HttpResponseException e) {
-			respondNow(createResponseFromException(e));
-			closeAfterWrite = true;
-			return true;
+	public void readData() throws IOException {
+		if(readBuffer.remaining() == 0) throw new IOException("Buffer is full");
+		if(getSocket().read(readBuffer) == -1) {
+			close();
+			return;
 		}
 
-		if(requestBuffer.isComplete()) {
-			processRequest(requestBuffer.getHeader());
-			requestBuffer.clear();
+		readBuffer.flip();
+
+		while(readBuffer.hasRemaining()) {
+			int before = readBuffer.position();
+
+			if(websocketConnection != null) {
+				try {
+					websocketConnection.readData(readBuffer);
+				}catch(InvalidFrameException e) {
+					close();
+					break;
+				}
+			}else {
+				try {
+					requestBuffer.readData(readBuffer);
+				}catch(HttpResponseException e) {
+					respondNow(createResponseFromException(e));
+					closeAfterWrite = true;
+					break;
+				}
+
+				if(requestBuffer.isComplete()) {
+					HttpClientHeader header = requestBuffer.getHeader();
+					requestBuffer.clear();
+					processRequest(header);
+					break; // Don't continue reading data to avoid issues with multiple requests being processed at the same time
+				}
+			}
+
+			if(readBuffer.position() == before) break; // Nothing has been read this cycle, wait for more data from client
 		}
 
-		return true;
-	}
-
-	private boolean fillBuffer() throws IOException {
-		buffer.clear();
-
-		int n;
-		if((n = bodyStream.read(byteBuffer)) == -1) {
-			buffer.clear();
-			response = null;
-			bodyStream = null;
-			headerBuffer = null;
-
-			return false;
-		}
-
-		buffer.put(byteBuffer, 0, n);
-		buffer.flip();
-		return true;
+		readBuffer.compact();
 	}
 
 	@Override
-	public boolean writeData() throws IOException {
-		if(headerBuffer == null) {
-			headerBuffer = ByteBuffer.wrap(response.getHeaderBytes());
-		}else if(headerBuffer.remaining() > 0) {
-			getSocket().write(headerBuffer);
-
-			if(headerBuffer.remaining() == 0) {
-				fillBuffer();
-			}
+	public void writeData() throws IOException {
+		if(websocketConnection != null && responseBuffer.isComplete()) {
+			websocketConnection.writeData(getSocket());
 		}else {
-			if(buffer.remaining() == 0 && !fillBuffer()) {
-				if(closeAfterWrite) return false;
+			responseBuffer.writeData(getSocket());
+
+			if(responseBuffer.isComplete()) {
+				responseBuffer.clear();
+
+				if(closeAfterWrite) {
+					close();
+					return;
+				}
 
 				// Response has been written, go back to waiting for a request
 				getSelectionKey().interestOps(SelectionKey.OP_READ);
-				return true;
 			}
-			getSocket().write(buffer);
 		}
-
-		return true;
 	}
 
 	private void processRequest(HttpClientHeader request) {
@@ -149,9 +147,7 @@ public class HttpConnection extends AbstractConnection {
 	}
 
 	private void respondNow(HttpServerHeader response) throws IOException {
-		this.response = response;
-		this.bodyStream = response.getContent();
-		this.bodyStream.skip(response.getContentOffset());
+		responseBuffer.init(response);
 
 		// Write the response back to the client
 		getSelectionKey().interestOps(SelectionKey.OP_WRITE);
@@ -276,7 +272,7 @@ public class HttpConnection extends AbstractConnection {
 
 	@Override
 	public void close() {
-		if(websocketConnection != null && isSocketAlive()) websocketConnection.sendCloseFrame(CloseFrame.GOING_AWAY, "Server shutting down");
+		if(websocketConnection != null && !websocketConnection.isClosed() && isSocketAlive()) websocketConnection.close(CloseFrame.GOING_AWAY, "Server shutting down");
 		super.close();
 	}
 

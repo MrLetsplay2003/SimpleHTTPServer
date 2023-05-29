@@ -1,29 +1,44 @@
 package me.mrletsplay.simplehttpserver.http.websocket;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
+import java.nio.channels.SelectionKey;
 import java.nio.charset.StandardCharsets;
 
 import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
+import me.mrletsplay.simplehttpserver.http.websocket.buffer.IncomingFrameBuffer;
+import me.mrletsplay.simplehttpserver.http.websocket.buffer.OutgoingFrameBuffer;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.BinaryFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
+import me.mrletsplay.simplehttpserver.http.websocket.frame.PongFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.TextFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketFrame;
+import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketOpCode;
 
 public class WebSocketConnection {
+
+	// FIXME: onClose might not be called if the client disconnects without sending a close frame
 
 	private HttpConnection httpConnection;
 	private WebSocketEndpoint endpoint;
 
 	private boolean hasSentCloseFrame;
 	private boolean closed;
+	private boolean closeAfterWrite;
 
 	private WebSocketFrame incompleteFrame;
 
 	private Object attachment;
 
+	private IncomingFrameBuffer inBuffer;
+	private OutgoingFrameBuffer outBuffer;
+
 	public WebSocketConnection(HttpConnection httpConnection, WebSocketEndpoint endpoint) {
 		this.httpConnection = httpConnection;
 		this.endpoint = endpoint;
+		this.inBuffer = new IncomingFrameBuffer();
+		this.outBuffer = new OutgoingFrameBuffer();
 	}
 
 	public HttpConnection getHttpConnection() {
@@ -43,24 +58,84 @@ public class WebSocketConnection {
 		return (T) attachment;
 	}
 
-	public boolean readData() throws IOException {
-		return true;
+	public void readData(ByteBuffer buffer) throws IOException {
+		inBuffer.readData(buffer); // TODO: handle InvalidFrameException
+
+		if(inBuffer.isComplete()) {
+			WebSocketFrame frame = inBuffer.getFrame();
+			inBuffer.clear();
+			processFrame(frame);
+		}
 	}
 
-	public boolean writeData() {
-		return true;
+	private void processFrame(WebSocketFrame frame) {
+		httpConnection.getServer().getExecutor().submit(() -> {
+			endpoint.onFrameReceived(this, frame);
+
+			if(frame.getOpCode().isControl()) {
+				switch(frame.getOpCode()) {
+					case CONNECTION_CLOSE:
+						if(hasSentCloseFrame) {
+							forceClose();
+							return;
+						}
+
+						CloseFrame cf = (CloseFrame) frame;
+						sendCloseFrame(cf.getCode(), cf.getReason());
+						closeAfterWrite = true;
+						return;
+					case PING:
+						endpoint.onPing(this, frame.getPayload());
+						send(new PongFrame(true, false, false, false, new byte[0]));
+						return;
+					case PONG:
+						endpoint.onPong(this, frame.getPayload());
+						return;
+					default:
+						throw new WebSocketException("Unsupported control frame: " + frame.getOpCode());
+				}
+			}
+
+			if(incompleteFrame != null) {
+				if(frame.getOpCode() != WebSocketOpCode.CONTINUATION_FRAME) throw new WebSocketException("Interleaving of message frames is not allowed");
+				incompleteFrame.appendPayload(frame.getPayload());
+				if(frame.isFin()) {
+					handleCompleteFrame(frame);
+					incompleteFrame = null;
+				}
+				return;
+			}
+
+			if(frame.getOpCode() == WebSocketOpCode.CONTINUATION_FRAME) throw new WebSocketException("Received continuation frame without prior incomplete frame");
+
+			if(!frame.isFin()) {
+				incompleteFrame = frame;
+				return;
+			}
+
+			handleCompleteFrame(frame);
+		});
+	}
+
+	public void writeData(ByteChannel buffer) throws IOException {
+		outBuffer.writeData(buffer);
+
+		if(outBuffer.isComplete()) {
+			if(closeAfterWrite) {
+				forceClose();
+				return;
+			}
+
+			httpConnection.getSelectionKey().interestOpsAnd(~SelectionKey.OP_WRITE);
+		}
 	}
 
 	public void send(WebSocketFrame frame) {
-//		if(closed) throw new WebSocketException("Connection is closed");
-//		try {
-//			for(WebSocketFrame f : frame.split()) {
-//				f.write(httpConnection.getSocket().getOutputStream());
-//			}
-//			httpConnection.getSocket().getOutputStream().flush();
-//		}catch(IOException e) {
-//			throw new WebSocketException("Failed to send frame", e);
-//		}
+		if(closed) throw new WebSocketException("Connection is closed");
+		outBuffer.sendFrame(frame);
+
+		httpConnection.getSelectionKey().interestOpsOr(SelectionKey.OP_WRITE);
+		httpConnection.getServer().getSelector().wakeup();
 	}
 
 	public void sendText(String message) {
@@ -71,7 +146,7 @@ public class WebSocketConnection {
 		send(new BinaryFrame(true, false, false, false, bytes));
 	}
 
-	public void forceClose() {
+	private void forceClose() {
 		forceClose(null);
 	}
 
@@ -82,7 +157,10 @@ public class WebSocketConnection {
 		endpoint.onClose(this, frame);
 	}
 
-	public void sendCloseFrame(int code, String reason) {
+	private void sendCloseFrame(int code, String reason) {
+		if(closed) return;
+		hasSentCloseFrame = true;
+
 		if(reason == null) {
 			send(CloseFrame.of(code));
 		}else {
@@ -92,7 +170,6 @@ public class WebSocketConnection {
 
 	public void close(int code, String reason) {
 		sendCloseFrame(code, reason);
-		hasSentCloseFrame = true;
 	}
 
 	public void close(int code) {
@@ -103,59 +180,8 @@ public class WebSocketConnection {
 		close(1000);
 	}
 
-	public void receive() throws IOException {
-//		WebSocketFrame frame;
-//		frame = WebSocketFrame.read(httpConnection.getSocket().getInputStream());
-//		if(frame == null) {
-//			// Mark connection as dead
-//			httpConnection.setDead();
-//			forceClose();
-//			return;
-//		}
-//
-//		endpoint.onFrameReceived(this, frame);
-//
-//		if(frame.getOpCode().isControl()) {
-//			switch(frame.getOpCode()) {
-//				case CONNECTION_CLOSE:
-//					if(hasSentCloseFrame) {
-//						forceClose();
-//						endpoint.onClose(this, (CloseFrame) frame);
-//						return;
-//					}
-//
-//					close();
-//					return;
-//				case PING:
-//					endpoint.onPing(this, frame.getPayload());
-//					send(new PongFrame(true, false, false, false, new byte[0]));
-//					return;
-//				case PONG:
-//					endpoint.onPong(this, frame.getPayload());
-//					return;
-//				default:
-//					throw new WebSocketException("Unsupported control frame: " + frame.getOpCode());
-//			}
-//		}
-//
-//		if(incompleteFrame != null) {
-//			if(frame.getOpCode() != WebSocketOpCode.CONTINUATION_FRAME) throw new WebSocketException("Interleaving of message frames is not allowed");
-//			incompleteFrame.appendPayload(frame.getPayload());
-//			if(frame.isFin()) {
-//				handleCompleteFrame(frame);
-//				incompleteFrame = null;
-//			}
-//			return;
-//		}
-//
-//		if(frame.getOpCode() == WebSocketOpCode.CONTINUATION_FRAME) throw new WebSocketException("Received continuation frame without prior incomplete frame");
-//
-//		if(!frame.isFin()) {
-//			incompleteFrame = frame;
-//			return;
-//		}
-//
-//		handleCompleteFrame(frame);
+	public boolean isClosed() {
+		return closed;
 	}
 
 	private void handleCompleteFrame(WebSocketFrame frame) {

@@ -70,30 +70,34 @@ public abstract class AbstractServer implements Server {
 		while(iterator.hasNext()) {
 			SelectionKey key = iterator.next();
 
-			if(key.isAcceptable()) {
+			if(key.isValid() && key.isAcceptable()) {
 				Connection con = acceptConnection(key);
 				con.getSocket().register(selector, SelectionKey.OP_READ, con);
 			}
 
-			if(key.isReadable()) {
+			if(key.isValid() && key.isReadable()) {
 				Connection con = (Connection) key.attachment();
 				try {
-					if(!con.isSocketAlive() || !con.readData()) {
+					if(!con.isSocketAlive()) {
 						con.close();
 						continue;
 					}
+
+					con.readData();
 				}catch(IOException e) {
 					getLogger().error("Client read error", e);
 				}
 			}
 
-			if(key.isWritable()) {
+			if(key.isValid() && key.isWritable()) {
 				Connection con = (Connection) key.attachment();
 				try {
-					if(!con.isSocketAlive() || !con.writeData()) {
+					if(!con.isSocketAlive()) {
 						con.close();
 						continue;
 					}
+
+					con.writeData();
 				}catch(IOException e) {
 					getLogger().error("Client write error", e);
 				}
