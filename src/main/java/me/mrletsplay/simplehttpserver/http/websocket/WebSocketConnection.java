@@ -107,6 +107,8 @@ public class WebSocketConnection {
 //		WebSocketFrame frame;
 //		frame = WebSocketFrame.read(httpConnection.getSocket().getInputStream());
 //		if(frame == null) {
+//			// Mark connection as dead
+//			httpConnection.setDead();
 //			forceClose();
 //			return;
 //		}

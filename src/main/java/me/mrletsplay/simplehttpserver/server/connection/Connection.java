@@ -34,7 +34,7 @@ public interface Connection {
 	}
 
 	public default boolean isSocketAlive() {
-		return getSocket().isConnected() || getSocket().isConnectionPending();
+		return isDead() && getSocket().isConnected() || getSocket().isConnectionPending();
 	}
 
 }
