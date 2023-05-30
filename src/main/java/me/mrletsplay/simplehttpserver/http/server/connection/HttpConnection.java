@@ -8,11 +8,13 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import me.mrletsplay.mrcore.misc.FriendlyException;
+import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
 import me.mrletsplay.simplehttpserver.http.HttpStatusCodes;
 import me.mrletsplay.simplehttpserver.http.compression.HttpCompressionMethod;
 import me.mrletsplay.simplehttpserver.http.document.HttpDocument;
@@ -168,6 +170,10 @@ public class HttpConnection extends AbstractConnection {
 	}
 
 	private HttpServerHeader createResponse(HttpClientHeader h) {
+		if(getServer().getConfiguration().isHandleOptionsRequests() && h.getMethod() == HttpRequestMethod.OPTIONS) {
+			return createOptionsRequestResponse(h);
+		}
+
 		HttpServerHeader sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
 		HttpRequestContext ctx = new HttpRequestContext(this, h, sh);
 		HttpRequestContext.setCurrentContext(ctx);
@@ -196,6 +202,19 @@ public class HttpConnection extends AbstractConnection {
 			ctx.setException(e);
 
 			getServer().getDocumentProvider().getErrorDocument().createContent();
+		}
+
+		return sh;
+	}
+
+	private HttpServerHeader createOptionsRequestResponse(HttpClientHeader h) {
+		HttpServerHeader sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
+
+		if(h.getPath().getDocumentPath().equals("*")) {
+			sh.getFields().set("Allow", Arrays.stream(HttpRequestMethod.values()).map(m -> m.name()).collect(Collectors.joining(", ")));
+		}else {
+			Set<HttpRequestMethod> methods = getServer().getDocumentProvider().getOptions(h.getPath().getDocumentPath());
+			sh.getFields().set("Allow", methods.stream().map(m -> m.name()).collect(Collectors.joining(", ")));
 		}
 
 		return sh;

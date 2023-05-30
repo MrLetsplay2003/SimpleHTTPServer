@@ -8,19 +8,26 @@ import me.mrletsplay.simplehttpserver.server.impl.AbstractServerConfiguration;
 public class HttpServerConfiguration extends AbstractServerConfiguration {
 
 	protected boolean debugMode;
+	protected boolean handleOptionsRequests;
 
-	protected HttpServerConfiguration(String host, int port, Logger logger, int poolSize, boolean debugMode) {
+	protected HttpServerConfiguration(String host, int port, Logger logger, int poolSize, boolean debugMode, boolean handleOptionsRequests) {
 		super(host, port, logger, poolSize);
 		this.debugMode = debugMode;
+		this.handleOptionsRequests = handleOptionsRequests;
 	}
 
 	public boolean isDebugMode() {
 		return debugMode;
 	}
 
+	public boolean isHandleOptionsRequests() {
+		return handleOptionsRequests;
+	}
+
 	public static class Builder extends AbstractServerConfigurationBuilder<HttpServerConfiguration, Builder> {
 
 		protected boolean debugMode;
+		protected boolean handleOptionsRequests = true;
 
 		public Builder() {
 			this.poolSize = Runtime.getRuntime().availableProcessors();
@@ -28,6 +35,11 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 
 		public Builder debugMode(boolean debugMode) {
 			this.debugMode = debugMode;
+			return this;
+		}
+
+		public Builder handleOptionsRequests(boolean handleOptionsRequests) {
+			this.handleOptionsRequests = handleOptionsRequests;
 			return this;
 		}
 
@@ -41,7 +53,7 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 		@Override
 		public HttpServerConfiguration create() throws IllegalStateException {
 			verify();
-			return new HttpServerConfiguration(host, port, logger, poolSize, debugMode);
+			return new HttpServerConfiguration(host, port, logger, poolSize, debugMode, handleOptionsRequests);
 		}
 
 	}
