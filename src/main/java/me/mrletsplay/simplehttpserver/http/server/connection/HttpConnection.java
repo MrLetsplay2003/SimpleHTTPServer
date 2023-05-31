@@ -34,7 +34,7 @@ import me.mrletsplay.simplehttpserver.server.connection.AbstractConnection;
 
 public class HttpConnection extends AbstractConnection {
 
-	public static final int DEFAULT_MAX_CLIENT_HEADER_SIZE = 16384; // TODO: configurable
+	public static final int DEFAULT_MAX_CLIENT_HEADER_SIZE = 16384;
 
 	private WebSocketConnection websocketConnection;
 
@@ -50,7 +50,7 @@ public class HttpConnection extends AbstractConnection {
 
 		this.requestBuffer = new RequestBuffer();
 		this.responseBuffer = new ResponseBuffer();
-		this.readBuffer = ByteBuffer.allocate(DEFAULT_MAX_CLIENT_HEADER_SIZE);
+		this.readBuffer = ByteBuffer.allocate(server.getConfiguration().getMaxClientHeaderSize());
 	}
 
 	public boolean isSecure() {

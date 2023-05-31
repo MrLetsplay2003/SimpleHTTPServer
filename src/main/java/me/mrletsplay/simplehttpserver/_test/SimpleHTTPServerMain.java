@@ -14,8 +14,6 @@ import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketFrame;
 
 public class SimpleHTTPServerMain {
 
-	// TODO: OPTIONS request
-
 	public static void main(String[] args) {
 		HttpServer srv = new HttpServer(HttpServer.newConfigurationBuilder()
 			.host("localhost")

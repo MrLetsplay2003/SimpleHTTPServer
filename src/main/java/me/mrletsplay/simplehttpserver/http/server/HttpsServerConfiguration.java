@@ -12,8 +12,8 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 
 	private String certificatePassword;
 
-	protected HttpsServerConfiguration(String host, int port, Logger logger, int poolSize, boolean debugMode, boolean handleOptionsRequests, File certificateFile, File certificateKeyFile, String certificatePassword) {
-		super(host, port, logger, poolSize, debugMode, handleOptionsRequests);
+	protected HttpsServerConfiguration(String host, int port, Logger logger, int poolSize, boolean debugMode, boolean handleOptionsRequests, int maxClientHeaderSize, File certificateFile, File certificateKeyFile, String certificatePassword) {
+		super(host, port, logger, poolSize, debugMode, handleOptionsRequests, maxClientHeaderSize);
 		this.certificateFile = certificateFile;
 		this.certificateKeyFile = certificateKeyFile;
 		this.certificatePassword = certificatePassword;
@@ -64,6 +64,11 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 			return (Builder) super.handleOptionsRequests(handleOptionsRequests);
 		}
 
+		@Override
+		public Builder maxClientHeaderSize(int maxClientHeaderSize) {
+			return (Builder) super.maxClientHeaderSize(maxClientHeaderSize);
+		}
+
 		public Builder certificate(File certificateFile, File certificateKeyFile) {
 			this.certificateFile = certificateFile;
 			this.certificateKeyFile = certificateKeyFile;
@@ -85,7 +90,7 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 		@Override
 		public HttpsServerConfiguration create() throws IllegalStateException {
 			verify();
-			return new HttpsServerConfiguration(host, port, logger, poolSize, debugMode, handleOptionsRequests, certificateFile, certificateKeyFile, certificatePassword);
+			return new HttpsServerConfiguration(host, port, logger, poolSize, debugMode, handleOptionsRequests, maxClientHeaderSize, certificateFile, certificateKeyFile, certificatePassword);
 		}
 
 	}
