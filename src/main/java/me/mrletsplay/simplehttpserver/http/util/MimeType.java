@@ -48,10 +48,12 @@ public class MimeType {
 	}
 
 	public static MimeType of(String mediaType) {
+		if(mediaType == null) return null;
 		return new MimeType(mediaType, null, null);
 	}
 
 	public static MimeType of(String mediaType, String charset) {
+		if(mediaType == null) return null;
 		return new MimeType(mediaType, charset, null);
 	}
 
