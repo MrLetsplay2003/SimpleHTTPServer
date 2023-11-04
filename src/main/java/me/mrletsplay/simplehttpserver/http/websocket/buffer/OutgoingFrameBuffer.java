@@ -3,12 +3,12 @@ package me.mrletsplay.simplehttpserver.http.websocket.buffer;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ByteChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketFrame;
+import me.mrletsplay.simplehttpserver.util.BufferUtil;
 
 public class OutgoingFrameBuffer {
 
@@ -27,7 +27,7 @@ public class OutgoingFrameBuffer {
 		}
 	}
 
-	public void writeData(ByteChannel buffer) throws IOException {
+	public void writeData(ByteBuffer buffer) throws IOException {
 		if(currentFrame == null) {
 			synchronized (framesLock) {
 				if(frames.isEmpty()) return;
@@ -38,7 +38,7 @@ public class OutgoingFrameBuffer {
 			}
 		}
 
-		buffer.write(currentFrame);
+		BufferUtil.copyAvailable(currentFrame, buffer);
 		if(!currentFrame.hasRemaining()) currentFrame = null;
 	}
 

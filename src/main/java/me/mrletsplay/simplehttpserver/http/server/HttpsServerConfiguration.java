@@ -69,6 +69,11 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 			return (Builder) super.maxClientHeaderSize(maxClientHeaderSize);
 		}
 
+		@Override
+		public Builder poolSize(int poolSize) {
+			return (Builder) super.poolSize(poolSize);
+		}
+
 		public Builder certificate(File certificateFile, File certificateKeyFile) {
 			this.certificateFile = certificateFile;
 			this.certificateKeyFile = certificateKeyFile;

@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
@@ -23,8 +22,6 @@ import java.util.Base64;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLServerSocket;
-import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509KeyManager;
@@ -32,52 +29,27 @@ import javax.net.ssl.X509TrustManager;
 
 import me.mrletsplay.mrcore.io.IOUtils;
 
-public class SSLCertificateSocketFactory {
+public class SSLHelper {
 
-	private File
-		certificateFile,
-		certificatePrivateKeyFile;
+	private SSLHelper() {}
 
-	private String certificatePassword;
-
-	private Certificate[] certificateChain;
-
-	private TrustManager[] trustManagers;
-
-	private KeyManager[] keyManagers;
-
-	private SSLContext sslContext;
-
-	private SSLServerSocketFactory socketFactory;
-
-	public SSLCertificateSocketFactory(File certificateFile, File certificatePrivateKeyFile, String certificatePassword) throws FileNotFoundException, IOException, GeneralSecurityException {
-		this.certificateFile = certificateFile;
-		this.certificatePrivateKeyFile = certificatePrivateKeyFile;
-		this.certificatePassword = certificatePassword;
-		load();
-	}
-
-	private void load() throws FileNotFoundException, IOException, GeneralSecurityException {
+	public static SSLContext createSSLContext(File certificateFile, File certificatePrivateKeyFile, String certificatePassword) throws FileNotFoundException, IOException, GeneralSecurityException {
 		KeyStore keyStore = KeyStore.getInstance("JKS");
 		keyStore.load(null);
-		this.certificateChain = loadCertificateChain(certificateFile);
+		Certificate[] certificateChain = loadCertificateChain(certificateFile);
 		for(int i = 0; i < certificateChain.length; i++) {
 			keyStore.setCertificateEntry("certificate" + i, certificateChain[i]);
 		}
 		keyStore.setKeyEntry("certificateKey", loadCertificateKey(certificatePrivateKeyFile), certificatePassword != null ? certificatePassword.toCharArray() : new char[0], certificateChain);
-		this.trustManagers = createTrustManagers(keyStore);
-		this.keyManagers = createKeyManagers(keyStore);
+		TrustManager[] trustManagers = createTrustManagers(keyStore);
+		KeyManager[] keyManagers = createKeyManagers(keyStore, certificatePassword);
 
-		sslContext = SSLContext.getInstance("TLSv1.3");
+		SSLContext sslContext = SSLContext.getInstance("TLSv1.3");
 		sslContext.init(keyManagers, trustManagers, null);
-		socketFactory = sslContext.getServerSocketFactory();
+		return sslContext;
 	}
 
-	public SSLServerSocket createServerSocket(String host, int port) throws IOException {
-		return (SSLServerSocket) socketFactory.createServerSocket(port, 50, InetAddress.getByName(host));
-	}
-
-	private X509TrustManager[] createTrustManagers(KeyStore keystore) throws NoSuchAlgorithmException, KeyStoreException {
+	private static X509TrustManager[] createTrustManagers(KeyStore keystore) throws NoSuchAlgorithmException, KeyStoreException {
 		TrustManagerFactory trustMgrFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
 		trustMgrFactory.init(keystore);
 		TrustManager trustManagers[] = trustMgrFactory.getTrustManagers();
@@ -91,7 +63,7 @@ public class SSLCertificateSocketFactory {
 		return null;
 	}
 
-	private X509KeyManager[] createKeyManagers(KeyStore keystore) throws NoSuchAlgorithmException, KeyStoreException, UnrecoverableKeyException {
+	private static X509KeyManager[] createKeyManagers(KeyStore keystore, String certificatePassword) throws NoSuchAlgorithmException, KeyStoreException, UnrecoverableKeyException {
 		KeyManagerFactory keyMgrFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
 		keyMgrFactory.init(keystore, certificatePassword != null ? certificatePassword.toCharArray() : new char[0]);
 		KeyManager keyManagers[] = keyMgrFactory.getKeyManagers();
@@ -105,20 +77,20 @@ public class SSLCertificateSocketFactory {
 		return null;
 	}
 
-	private Certificate[] loadCertificateChain(File certFile) throws CertificateException, FileNotFoundException, IOException {
+	private static Certificate[] loadCertificateChain(File certFile) throws CertificateException, FileNotFoundException, IOException {
 		CertificateFactory f = CertificateFactory.getInstance("X.509");
 		try(FileInputStream in = new FileInputStream(certFile)) {
 			return f.generateCertificates(in).toArray(Certificate[]::new);
 		}
 	}
 
-	private PrivateKey loadCertificateKey(File certKeyFile) throws FileNotFoundException, IOException, GeneralSecurityException {
+	private static PrivateKey loadCertificateKey(File certKeyFile) throws FileNotFoundException, IOException, GeneralSecurityException {
 		try(FileInputStream in = new FileInputStream(certKeyFile)) {
 			return getPrivateKeyFromString(new String(IOUtils.readAllBytes(in), StandardCharsets.UTF_8));
 		}
 	}
 
-	private RSAPrivateKey getPrivateKeyFromString(String key) throws IOException, GeneralSecurityException {
+	private static RSAPrivateKey getPrivateKeyFromString(String key) throws IOException, GeneralSecurityException {
 		String privateKeyPEM = key;
 		privateKeyPEM = privateKeyPEM.replace("-----BEGIN PRIVATE KEY-----", "");
 		privateKeyPEM = privateKeyPEM.replace("-----END PRIVATE KEY-----", "");

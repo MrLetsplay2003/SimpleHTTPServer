@@ -2,21 +2,24 @@ package me.mrletsplay.simplehttpserver.http.server;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.UnknownHostException;
-import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.security.GeneralSecurityException;
 
+import javax.net.ssl.SSLContext;
+
 import me.mrletsplay.mrcore.misc.FriendlyException;
-import me.mrletsplay.simplehttpserver.http.ssl.SSLCertificateSocketFactory;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpsConnection;
+import me.mrletsplay.simplehttpserver.http.ssl.SSLHelper;
 
 public class HttpsServer extends HttpServer {
 
-	private SSLCertificateSocketFactory socketFactory;
+	private SSLContext sslContext;
 
 	public HttpsServer(HttpsServerConfiguration configuration) {
 		super(configuration);
 		try {
-			this.socketFactory = new SSLCertificateSocketFactory(configuration.getCertificateFile(), configuration.getCertificateKeyFile(), configuration.getCertificatePassword());
+			this.sslContext = SSLHelper.createSSLContext(configuration.getCertificateFile(), configuration.getCertificateKeyFile(), configuration.getCertificatePassword());
 		} catch (IOException | GeneralSecurityException e) {
 			throw new FriendlyException("Failed to intialize http server", e);
 		}
@@ -43,9 +46,8 @@ public class HttpsServer extends HttpServer {
 	}
 
 	@Override
-	protected ServerSocketChannel createSocket() throws UnknownHostException, IOException {
-		return null; // TODO
-//		return socketFactory.createServerSocket(getConfiguration().getHost(), getConfiguration().getPort());
+	public HttpConnection createConnection(SocketChannel socket) {
+		return new HttpsConnection(this, socket, sslContext);
 	}
 
 	public static HttpsServerConfiguration.Builder newConfigurationBuilder() {

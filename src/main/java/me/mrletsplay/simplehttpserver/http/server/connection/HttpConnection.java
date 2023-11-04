@@ -41,7 +41,8 @@ public class HttpConnection extends AbstractConnection {
 	private RequestBuffer requestBuffer;
 	private ResponseBuffer responseBuffer;
 
-	private ByteBuffer readBuffer;
+	protected ByteBuffer readBuffer;
+	protected ByteBuffer writeBuffer;
 
 	private boolean closeAfterWrite;
 
@@ -51,11 +52,12 @@ public class HttpConnection extends AbstractConnection {
 		this.requestBuffer = new RequestBuffer();
 		this.responseBuffer = new ResponseBuffer();
 		this.readBuffer = ByteBuffer.allocate(server.getConfiguration().getMaxClientHeaderSize());
+		this.writeBuffer = ByteBuffer.allocate(server.getConfiguration().getMaxClientHeaderSize());
+		this.writeBuffer.limit(0);
 	}
 
 	public boolean isSecure() {
-//		return getSocket() instanceof SSLSocket;
-		return false; // TODO
+		return false;
 	}
 
 	@Override
@@ -67,7 +69,11 @@ public class HttpConnection extends AbstractConnection {
 		}
 
 		readBuffer.flip();
+		readData(readBuffer);
+		readBuffer.compact();
+	}
 
+	protected void readData(ByteBuffer readBuffer) throws IOException {
 		while(readBuffer.hasRemaining()) {
 			int before = readBuffer.position();
 
@@ -97,28 +103,47 @@ public class HttpConnection extends AbstractConnection {
 
 			if(readBuffer.position() == before) break; // Nothing has been read this cycle, wait for more data from client
 		}
-
-		readBuffer.compact();
 	}
 
 	@Override
 	public void writeData() throws IOException {
+		if(!writeBuffer.hasRemaining()) {
+			writeBuffer.clear();
+			writeData(writeBuffer);
+			writeBuffer.flip();
+		}
+
+		if(getSocket().write(writeBuffer) == -1) {
+			close();
+			return;
+		}
+
+		if(!writeBuffer.hasRemaining()) {
+			finishWrite();
+		}
+	}
+
+	protected void finishWrite() {
 		if(websocketConnection != null && responseBuffer.isComplete()) {
-			websocketConnection.writeData(getSocket());
-		}else {
-			responseBuffer.writeData(getSocket());
+			websocketConnection.finishWrite();
+		}else if(responseBuffer.isComplete()) {
+			responseBuffer.clear();
 
-			if(responseBuffer.isComplete()) {
-				responseBuffer.clear();
-
-				if(closeAfterWrite) {
-					close();
-					return;
-				}
-
-				// Response has been written, go back to waiting for a request
-				getSelectionKey().interestOps(SelectionKey.OP_READ);
+			if(closeAfterWrite) {
+				close();
+				return;
 			}
+
+			// Response has been written, go back to waiting for a request
+			getSelectionKey().interestOps(SelectionKey.OP_READ);
+		}
+	}
+
+	protected void writeData(ByteBuffer writeBuffer) throws IOException {
+		if(websocketConnection != null && responseBuffer.isComplete()) {
+			websocketConnection.writeData(writeBuffer);
+		}else {
+			responseBuffer.writeData(writeBuffer);
 		}
 	}
 

@@ -9,6 +9,14 @@ import me.mrletsplay.simplehttpserver.server.ServerException;
 
 public interface Connection {
 
+	public default boolean canReadData() {
+		return getSelectionKey().isReadable();
+	}
+
+	public default boolean canWriteData() {
+		return getSelectionKey().isWritable();
+	}
+
 	public void readData() throws IOException;
 
 	public void writeData() throws IOException;

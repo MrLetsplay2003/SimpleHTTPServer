@@ -75,31 +75,34 @@ public abstract class AbstractServer implements Server {
 				con.getSocket().register(selector, SelectionKey.OP_READ, con);
 			}
 
-			if(key.isValid() && key.isReadable()) {
+			if(key.attachment() instanceof Connection) {
 				Connection con = (Connection) key.attachment();
-				try {
-					if(!con.isSocketAlive()) {
-						con.close();
-						continue;
-					}
+				if(key.isValid() && con.canReadData()) {
+					try {
+						if(!con.isSocketAlive()) {
+							con.close();
+							continue;
+						}
 
-					con.readData();
-				}catch(IOException e) {
-					getLogger().error("Client read error", e);
+						con.readData();
+					}catch(IOException e) {
+						getLogger().error("Client read error", e);
+						con.close();
+					}
 				}
-			}
 
-			if(key.isValid() && key.isWritable()) {
-				Connection con = (Connection) key.attachment();
-				try {
-					if(!con.isSocketAlive()) {
+				if(key.isValid() && con.canWriteData()) {
+					try {
+						if(!con.isSocketAlive()) {
+							con.close();
+							continue;
+						}
+
+						con.writeData();
+					}catch(IOException e) {
+						getLogger().error("Client write error", e);
 						con.close();
-						continue;
 					}
-
-					con.writeData();
-				}catch(IOException e) {
-					getLogger().error("Client write error", e);
 				}
 			}
 
@@ -111,7 +114,7 @@ public abstract class AbstractServer implements Server {
 		SocketChannel client = socket.accept();
 		client.configureBlocking(false);
 
-		Connection con = acceptor.createConnection(client);
+		Connection con = createConnection(client);
 		acceptor.accept(con);
 		return con;
 	}

@@ -2,7 +2,6 @@ package me.mrletsplay.simplehttpserver.http.websocket;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ByteChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.charset.StandardCharsets;
 
@@ -117,17 +116,23 @@ public class WebSocketConnection {
 		});
 	}
 
-	public void writeData(ByteChannel buffer) throws IOException {
+	public boolean isWriteComplete() {
+		return outBuffer.isComplete();
+	}
+
+	public void writeData(ByteBuffer buffer) throws IOException {
 		outBuffer.writeData(buffer);
+	}
 
-		if(outBuffer.isComplete()) {
-			if(closeAfterWrite) {
-				forceClose();
-				return;
-			}
+	public void finishWrite() {
+		if(!outBuffer.isComplete()) return;
 
-			httpConnection.getSelectionKey().interestOpsAnd(~SelectionKey.OP_WRITE);
+		if(closeAfterWrite) {
+			forceClose();
+			return;
 		}
+
+		httpConnection.getSelectionKey().interestOpsAnd(~SelectionKey.OP_WRITE);
 	}
 
 	public void send(WebSocketFrame frame) {

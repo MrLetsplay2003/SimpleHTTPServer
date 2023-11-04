@@ -1,5 +1,6 @@
 package me.mrletsplay.simplehttpserver.http.server;
 
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -10,6 +11,7 @@ import me.mrletsplay.simplehttpserver.http.compression.GzipCompression;
 import me.mrletsplay.simplehttpserver.http.compression.HttpCompressionMethod;
 import me.mrletsplay.simplehttpserver.http.document.DefaultDocumentProvider;
 import me.mrletsplay.simplehttpserver.http.document.DocumentProvider;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
 import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnectionAcceptor;
 import me.mrletsplay.simplehttpserver.server.impl.AbstractServer;
 
@@ -43,6 +45,11 @@ public class HttpServer extends AbstractServer {
 				.hostBindAll()
 				.port(port)
 				.create());
+	}
+
+	@Override
+	public HttpConnection createConnection(SocketChannel socket) {
+		return new HttpConnection(this, socket);
 	}
 
 	@Override

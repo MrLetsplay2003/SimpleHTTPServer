@@ -16,6 +16,7 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 		super(host, port, logger, poolSize);
 		this.debugMode = debugMode;
 		this.handleOptionsRequests = handleOptionsRequests;
+		this.maxClientHeaderSize = maxClientHeaderSize;
 	}
 
 	public boolean isDebugMode() {

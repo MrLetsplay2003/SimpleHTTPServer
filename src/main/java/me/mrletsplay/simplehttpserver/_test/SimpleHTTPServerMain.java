@@ -1,12 +1,13 @@
 package me.mrletsplay.simplehttpserver._test;
 
+import java.io.File;
 import java.util.Arrays;
 
 import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
 import me.mrletsplay.simplehttpserver.http.document.DocumentProvider;
 import me.mrletsplay.simplehttpserver.http.document.StringDocument;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
-import me.mrletsplay.simplehttpserver.http.server.HttpServer;
+import me.mrletsplay.simplehttpserver.http.server.HttpsServer;
 import me.mrletsplay.simplehttpserver.http.websocket.WebSocketConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.WebSocketEndpoint;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
@@ -15,10 +16,18 @@ import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketFrame;
 public class SimpleHTTPServerMain {
 
 	public static void main(String[] args) {
-		HttpServer srv = new HttpServer(HttpServer.newConfigurationBuilder()
+//		HttpServer srv = new HttpServer(HttpServer.newConfigurationBuilder()
+//			.host("localhost")
+//			.port(8080)
+//			.poolSize(20)
+////			.certificate(new File("TEST/certificate.pem"), new File("TEST/privatekey.pem"))
+//			.create());
+
+		HttpsServer srv = new HttpsServer(HttpsServer.newConfigurationBuilder()
 			.host("localhost")
 			.port(8080)
 			.poolSize(20)
+			.certificate(new File("TEST/certificate.pem"), new File("TEST/privatekey.pem"))
 			.create());
 
 		DocumentProvider provider = srv.getDocumentProvider();

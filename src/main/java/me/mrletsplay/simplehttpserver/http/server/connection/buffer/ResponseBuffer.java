@@ -3,9 +3,9 @@ package me.mrletsplay.simplehttpserver.http.server.connection.buffer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.ByteChannel;
 
 import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
+import me.mrletsplay.simplehttpserver.util.BufferUtil;
 
 public class ResponseBuffer {
 
@@ -46,21 +46,24 @@ public class ResponseBuffer {
 		return true;
 	}
 
-	public void writeData(ByteChannel channel) throws IOException {
+	public void writeData(ByteBuffer buffer) throws IOException {
+		System.out.println("WD");
 		if(headerBuffer == null) {
 			headerBuffer = ByteBuffer.wrap(response.getHeaderBytes());
-		}else if(headerBuffer.remaining() > 0) {
-			channel.write(headerBuffer);
+		}
 
-			if(headerBuffer.remaining() == 0) {
+		if(headerBuffer.remaining() > 0) {
+			BufferUtil.copyAvailable(headerBuffer, buffer);
+
+			if(!headerBuffer.hasRemaining()) {
 				if(!fillBuffer()) complete = true;
 			}
 		}else {
-			if(buffer.remaining() == 0 && !fillBuffer()) {
+			if(!this.buffer.hasRemaining() && !fillBuffer()) {
 				complete = true;
 			}
 
-			channel.write(buffer);
+			BufferUtil.copyAvailable(this.buffer, buffer);
 		}
 	}
 

@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.ProcessBuilder.Redirect;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,16 +21,40 @@ import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
 public class PHPFileDocument implements HttpDocument {
 
-	private File file;
+	private Path path;
 	private MimeType fallbackMimeType;
 
+	/**
+	 * @deprecated Use {@link #PHPFileDocument(Path, MimeType)} instead
+	 * @param file
+	 * @param fallbackMimeType
+	 */
+	@Deprecated
 	public PHPFileDocument(File file, MimeType fallbackMimeType) {
-		this.file = file;
+		this.path = file.toPath();
 		this.fallbackMimeType = fallbackMimeType;
 	}
 
+	public PHPFileDocument(Path path, MimeType fallbackMimeType) {
+		this.path = path;
+		this.fallbackMimeType = fallbackMimeType;
+	}
+
+	/**
+	 * @deprecated Use {@link #PHPFileDocument(Path)} instead
+	 * @param file
+	 */
+	@Deprecated
 	public PHPFileDocument(File file) {
 		this(file, MimeType.HTML);
+	}
+
+	/**
+	 * Creates a PHP document with {@link MimeType#HTML} as its fallback MIME type
+	 * @param path
+	 */
+	public PHPFileDocument(Path path) {
+		this(path, MimeType.HTML);
 	}
 
 	@Override
@@ -50,7 +75,7 @@ public class PHPFileDocument implements HttpDocument {
 		env.put("REDIRECT_STATUS", "CGI");
 		env.put("REQUEST_METHOD", c.getClientHeader().getMethod().name());
 		env.put("SCRIPT_NAME", c.getClientHeader().getPath().getDocumentPath());
-		env.put("SCRIPT_FILENAME", file.toPath().toAbsolutePath().normalize().toString());
+		env.put("SCRIPT_FILENAME", path.toAbsolutePath().normalize().toString());
 		env.put("REQUEST_URI", c.getClientHeader().getPath().getDocumentPath());
 		env.put("QUERY_STRING", c.getClientHeader().getPath().getQuery().toString());
 		if(c.getClientHeader().getMethod() == HttpRequestMethod.POST
