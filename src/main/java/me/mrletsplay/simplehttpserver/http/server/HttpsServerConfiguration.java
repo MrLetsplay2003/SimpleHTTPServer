@@ -4,6 +4,8 @@ import java.io.File;
 
 import org.slf4j.Logger;
 
+import me.mrletsplay.simplehttpserver.http.cors.CorsConfiguration;
+
 public class HttpsServerConfiguration extends HttpServerConfiguration {
 
 	private File
@@ -57,6 +59,11 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 		@Override
 		public Builder debugMode(boolean debugMode) {
 			return (Builder) super.debugMode(debugMode);
+		}
+
+		@Override
+		public Builder defaultCorsConfiguration(CorsConfiguration defaultCorsConfiguration) {
+			return (Builder) super.defaultCorsConfiguration(defaultCorsConfiguration);
 		}
 
 		public Builder certificate(File certificateFile, File certificateKeyFile) {

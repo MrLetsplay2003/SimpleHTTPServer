@@ -8,7 +8,9 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -16,9 +18,12 @@ import java.util.stream.Collectors;
 import javax.net.ssl.SSLSocket;
 
 import me.mrletsplay.mrcore.misc.FriendlyException;
+import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
 import me.mrletsplay.simplehttpserver.http.HttpStatusCodes;
 import me.mrletsplay.simplehttpserver.http.compression.HttpCompressionMethod;
+import me.mrletsplay.simplehttpserver.http.cors.CorsConfiguration;
 import me.mrletsplay.simplehttpserver.http.document.HttpDocument;
+import me.mrletsplay.simplehttpserver.http.exception.HttpBadRequestException;
 import me.mrletsplay.simplehttpserver.http.exception.HttpResponseException;
 import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpHeaderFields;
@@ -146,18 +151,20 @@ public class HttpConnection extends AbstractConnection {
 			boolean cont = true;
 
 			RequestProcessor preProcessor = getServer().getRequestPreProcessor();
-			if(preProcessor != null) cont = process(ctx, preProcessor::process);
+			if(preProcessor != null) cont = process(ctx, preProcessor);
+
+			if(cont) cont = process(ctx, this::processCors);
 
 			final HttpDocument document = d;
 			if(cont) process(ctx, __ -> { document.createContent(); return true; });
 
 			RequestProcessor postProcessor = getServer().getRequestPostProcessor();
-			if(postProcessor != null) process(ctx, postProcessor::process);
+			if(postProcessor != null) process(ctx, postProcessor);
+
+			if(sh.isAllowByteRanges()) process(ctx, this::applyRanges);
+			if(sh.isCompressionEnabled()) process(ctx, this::applyCompression);
 
 			sh = ctx.getServerHeader();
-
-			if(sh.isAllowByteRanges()) applyRanges(sh);
-			if(sh.isCompressionEnabled()) applyCompression(sh);
 		}catch(Exception e) {
 			getServer().getLogger().error("Error while processing request", e);
 
@@ -181,11 +188,48 @@ public class HttpConnection extends AbstractConnection {
 		return sh;
 	}
 
-	private void applyRanges(HttpServerHeader sh) {
-		HttpRequestContext ctx = HttpRequestContext.getCurrentContext();
+	private boolean processCors(HttpRequestContext context) {
+		HttpClientHeader ch = context.getClientHeader();
+		HttpServerHeader sh = context.getServerHeader();
+		CorsConfiguration config = getServer().getConfiguration().getDefaultCorsConfiguration(); // TODO: allow per path (pattern) CORS configuration
+
+		if(ch.getMethod() == HttpRequestMethod.OPTIONS) {
+			String origin = ch.getFields().getFirst("Origin");
+			if(origin == null) throw new HttpBadRequestException("Missing origin");
+
+			// Ignoring Access-Control-Request-Method
+			// Ignoring Access-Control-Request-Headers
+
+			sh.setStatusCode(HttpStatusCodes.NO_CONTENT_204);
+
+			if(config.isAllowAllOrigins() || config.getAllowedOrigins().contains(origin)) {
+				sh.getFields().set("Access-Control-Allow-Origin", origin);
+			}else if(config.getAllowedOrigins().contains("*")) {
+				sh.getFields().set("Access-Control-Allow-Origin", "*");
+			}
+
+			Set<HttpRequestMethod> allowedMethods = new HashSet<>(config.getAllowedMethods());
+			if(!config.isSendAllAllowedMethods()) allowedMethods.retainAll(getServer().getDocumentProvider().getOptions(ch.getPath().getDocumentPath()));
+			if(!allowedMethods.isEmpty()) {
+				sh.getFields().set("Access-Control-Allow-Methods", allowedMethods.stream().map(m -> m.name()).collect(Collectors.joining(", ")));
+			}
+
+			sh.getFields().set("Access-Control-Expose-Headers", config.getExposedHeaders().stream().collect(Collectors.joining(", ")));
+			sh.getFields().set("Access-Control-Max-Age", String.valueOf(config.getMaxAge()));
+			if(config.isAllowCredentials()) sh.getFields().set("Access-Control-Allow-Credentials", "true");
+			if(!config.getAllowedHeaders().isEmpty()) sh.getFields().set("Access-Control-Allow-Headers", config.getAllowedHeaders().stream().collect(Collectors.joining(", ")));
+
+			return false;
+		}
+
+		return true;
+	}
+
+	private boolean applyRanges(HttpRequestContext context) {
+		HttpServerHeader sh = context.getServerHeader();
 
 		Pattern byteRangePattern = Pattern.compile("bytes=(?<start>\\d+)?-(?<end>\\d+)?"); // Multipart range requests are not supported
-		String range = ctx.getClientHeader().getFields().getFirst("Range");
+		String range = context.getClientHeader().getFields().getFirst("Range");
 		if(range != null) {
 			Matcher m = byteRangePattern.matcher(range);
 			if(m.matches()) {
@@ -210,7 +254,7 @@ public class HttpConnection extends AbstractConnection {
 					}else {
 						sh.setStatusCode(HttpStatusCodes.BAD_REQUEST_400);
 						sh.setContent(MimeType.HTML, "<h1>400 Bad Request</h1>".getBytes(StandardCharsets.UTF_8));
-						return;
+						return true;
 					}
 					sh.setStatusCode(HttpStatusCodes.PARTIAL_CONTENT_206);
 					sh.getFields().set("Content-Range", "bytes " + sh.getContentOffset() + "-" + (sh.getContentOffset() + sh.getContentLength() - 1) + "/" + sh.getTotalContentLength());
@@ -220,26 +264,34 @@ public class HttpConnection extends AbstractConnection {
 				}
 			}
 		}
+
+		return true;
 	}
 
-	private void applyCompression(HttpServerHeader sh) throws IOException {
-		HttpRequestContext ctx = HttpRequestContext.getCurrentContext();
+	private boolean applyCompression(HttpRequestContext context) {
+		HttpServerHeader sh = context.getServerHeader();
 
-		if(ctx.getClientHeader().getFields().getFirst("Accept-Encoding") == null) return;
-		if(sh.getContentLength() == 0 || sh.getContentLength() > Integer.MAX_VALUE) return;
+		if(context.getClientHeader().getFields().getFirst("Accept-Encoding") == null) return true;
+		if(sh.getContentLength() == 0 || sh.getContentLength() > Integer.MAX_VALUE) return true;
 
-		List<String> supCs = Arrays.stream(ctx.getClientHeader().getFields().getFirst("Accept-Encoding").split(","))
+		List<String> supCs = Arrays.stream(context.getClientHeader().getFields().getFirst("Accept-Encoding").split(","))
 				.map(String::trim)
 				.collect(Collectors.toList());
 		HttpCompressionMethod comp = getServer().getCompressionMethods().stream()
 				.filter(c -> supCs.contains(c.getName()))
 				.findFirst().orElse(null);
 		if(comp != null) {
-			InputStream content = sh.getContent();
-			byte[] uncompressedContent = content.readNBytes((int) sh.getContentLength());
-			sh.getFields().set("Content-Encoding", comp.getName());
-			sh.setContent(comp.compress(uncompressedContent));
+			try {
+				InputStream content = sh.getContent();
+				byte[] uncompressedContent = content.readNBytes((int) sh.getContentLength());
+				sh.getFields().set("Content-Encoding", comp.getName());
+				sh.setContent(comp.compress(uncompressedContent));
+			}catch(IOException e) {
+				throw new FriendlyException("Failed to apply compression to content", e);
+			}
 		}
+
+		return true;
 	}
 
 	@Override
