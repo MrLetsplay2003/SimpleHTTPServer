@@ -11,9 +11,10 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 	protected boolean debugMode;
 	protected CorsConfiguration defaultCorsConfiguration;
 
-	protected HttpServerConfiguration(String host, int port, Logger logger, boolean debugMode) {
+	protected HttpServerConfiguration(String host, int port, Logger logger, boolean debugMode, CorsConfiguration defaultCorsConfiguration) {
 		super(host, port, logger);
 		this.debugMode = debugMode;
+		this.defaultCorsConfiguration = defaultCorsConfiguration;
 	}
 
 	public boolean isDebugMode() {
@@ -48,7 +49,7 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 		@Override
 		public HttpServerConfiguration create() throws IllegalStateException {
 			verify();
-			return new HttpServerConfiguration(host, port, logger, debugMode);
+			return new HttpServerConfiguration(host, port, logger, debugMode, defaultCorsConfiguration);
 		}
 
 	}

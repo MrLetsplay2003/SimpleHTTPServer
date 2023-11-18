@@ -192,6 +192,7 @@ public class HttpConnection extends AbstractConnection {
 		HttpClientHeader ch = context.getClientHeader();
 		HttpServerHeader sh = context.getServerHeader();
 		CorsConfiguration config = getServer().getConfiguration().getDefaultCorsConfiguration(); // TODO: allow per path (pattern) CORS configuration
+		if(config == null) return true;
 
 		if(ch.getMethod() == HttpRequestMethod.OPTIONS) {
 			String origin = ch.getFields().getFirst("Origin");
