@@ -10,6 +10,7 @@ import me.mrletsplay.simplehttpserver.http.compression.GzipCompression;
 import me.mrletsplay.simplehttpserver.http.compression.HttpCompressionMethod;
 import me.mrletsplay.simplehttpserver.http.document.DefaultDocumentProvider;
 import me.mrletsplay.simplehttpserver.http.document.DocumentProvider;
+import me.mrletsplay.simplehttpserver.http.request.RequestProcessor;
 import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnectionAcceptor;
 import me.mrletsplay.simplehttpserver.server.impl.AbstractServer;
 
@@ -18,6 +19,9 @@ public class HttpServer extends AbstractServer {
 	private DocumentProvider documentProvider;
 	private HttpProtocolVersion protocolVersion;
 	private List<HttpCompressionMethod> compressionMethods;
+	private RequestProcessor
+		preProcessor,
+		postProcessor;
 
 	public HttpServer(HttpServerConfiguration configuration) {
 		super(configuration);
@@ -69,6 +73,31 @@ public class HttpServer extends AbstractServer {
 
 	public HttpProtocolVersion getProtocolVersion() {
 		return protocolVersion;
+	}
+
+	/**
+	 * Sets a request pre-processor that will run before the request is processed by the corresponding document.<br>
+	 * If the processor returns {@code false}, the request will not be processed by the document, however it will still be processed by the post-processor
+	 * @param preProcessor The pre-processor to use
+	 */
+	public void setRequestPreProcessor(RequestProcessor preProcessor) {
+		this.preProcessor = preProcessor;
+	}
+
+	public RequestProcessor getRequestPreProcessor() {
+		return preProcessor;
+	}
+
+	/**
+	 * Sets a request post-processor that will run after the request is processed by the corresponding document.<br>
+	 * @param postProcessor The post-processor to use
+	 */
+	public void setRequestPostProcessor(RequestProcessor postProcessor) {
+		this.postProcessor = postProcessor;
+	}
+
+	public RequestProcessor getRequestPostProcessor() {
+		return postProcessor;
 	}
 
 	public static HttpServerConfiguration.Builder newConfigurationBuilder() {

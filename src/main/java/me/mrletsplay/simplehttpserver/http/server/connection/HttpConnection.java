@@ -24,6 +24,7 @@ import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpHeaderFields;
 import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
 import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
+import me.mrletsplay.simplehttpserver.http.request.RequestProcessor;
 import me.mrletsplay.simplehttpserver.http.server.HttpServer;
 import me.mrletsplay.simplehttpserver.http.util.MimeType;
 import me.mrletsplay.simplehttpserver.http.websocket.WebSocketConnection;
@@ -124,6 +125,15 @@ public class HttpConnection extends AbstractConnection {
 		return keepAlive || websocketConnection != null;
 	}
 
+	private boolean process(HttpRequestContext context, RequestProcessor process) {
+		try {
+			return process.process(context);
+		}catch(HttpResponseException e) {
+			context.setServerHeader(createResponseFromException(e));
+			return false;
+		}
+	}
+
 	private HttpServerHeader createResponse(HttpClientHeader h) {
 		HttpServerHeader sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
 		HttpRequestContext ctx = new HttpRequestContext(this, h, sh);
@@ -133,18 +143,23 @@ public class HttpConnection extends AbstractConnection {
 		if(d == null) d = getServer().getDocumentProvider().getNotFoundDocument();
 
 		try {
-			try {
-				d.createContent();
+			boolean cont = true;
 
-				sh = ctx.getServerHeader();
-			}catch(HttpResponseException e) {
-				sh = createResponseFromException(e);
-			}
+			RequestProcessor preProcessor = getServer().getRequestPreProcessor();
+			if(preProcessor != null) cont = process(ctx, preProcessor::process);
+
+			final HttpDocument document = d;
+			if(cont) process(ctx, __ -> { document.createContent(); return true; });
+
+			RequestProcessor postProcessor = getServer().getRequestPostProcessor();
+			if(postProcessor != null) process(ctx, postProcessor::process);
+
+			sh = ctx.getServerHeader();
 
 			if(sh.isAllowByteRanges()) applyRanges(sh);
 			if(sh.isCompressionEnabled()) applyCompression(sh);
 		}catch(Exception e) {
-			getServer().getLogger().error("Error while creating page content", e);
+			getServer().getLogger().error("Error while processing request", e);
 
 			// Reset all of the context-related fields to ensure a clean environment
 			sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
