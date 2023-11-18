@@ -215,8 +215,8 @@ public class HttpConnection extends AbstractConnection {
 				sh.getFields().set("Access-Control-Allow-Methods", allowedMethods.stream().map(m -> m.name()).collect(Collectors.joining(", ")));
 			}
 
-			sh.getFields().set("Access-Control-Expose-Headers", config.getExposedHeaders().stream().collect(Collectors.joining(", ")));
 			sh.getFields().set("Access-Control-Max-Age", String.valueOf(config.getMaxAge()));
+			if(!config.getExposedHeaders().isEmpty()) sh.getFields().set("Access-Control-Expose-Headers", config.getExposedHeaders().stream().collect(Collectors.joining(", ")));
 			if(config.isAllowCredentials()) sh.getFields().set("Access-Control-Allow-Credentials", "true");
 			if(!config.getAllowedHeaders().isEmpty()) sh.getFields().set("Access-Control-Allow-Headers", config.getAllowedHeaders().stream().collect(Collectors.joining(", ")));
 
