@@ -23,7 +23,6 @@ import me.mrletsplay.simplehttpserver.http.HttpStatusCodes;
 import me.mrletsplay.simplehttpserver.http.compression.HttpCompressionMethod;
 import me.mrletsplay.simplehttpserver.http.cors.CorsConfiguration;
 import me.mrletsplay.simplehttpserver.http.document.HttpDocument;
-import me.mrletsplay.simplehttpserver.http.exception.HttpBadRequestException;
 import me.mrletsplay.simplehttpserver.http.exception.HttpResponseException;
 import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpHeaderFields;
@@ -153,6 +152,8 @@ public class HttpConnection extends AbstractConnection {
 			RequestProcessor preProcessor = getServer().getRequestPreProcessor();
 			if(preProcessor != null) cont = process(ctx, preProcessor);
 
+			if(cont) cont = process(ctx, this::processCorsPreflight);
+
 			if(cont) cont = process(ctx, this::processCors);
 
 			final HttpDocument document = d;
@@ -188,7 +189,7 @@ public class HttpConnection extends AbstractConnection {
 		return sh;
 	}
 
-	private boolean processCors(HttpRequestContext context) {
+	private boolean processCorsPreflight(HttpRequestContext context) {
 		HttpClientHeader ch = context.getClientHeader();
 		HttpServerHeader sh = context.getServerHeader();
 		CorsConfiguration config = getServer().getConfiguration().getDefaultCorsConfiguration(); // TODO: allow per path (pattern) CORS configuration
@@ -196,7 +197,7 @@ public class HttpConnection extends AbstractConnection {
 
 		if(ch.getMethod() == HttpRequestMethod.OPTIONS) {
 			String origin = ch.getFields().getFirst("Origin");
-			if(origin == null) throw new HttpBadRequestException("Missing origin");
+			if(origin == null) return true; // TODO: handle non-preflight OPTIONS requests
 
 			// Ignoring Access-Control-Request-Method
 			// Ignoring Access-Control-Request-Headers
@@ -221,6 +222,25 @@ public class HttpConnection extends AbstractConnection {
 			if(!config.getAllowedHeaders().isEmpty()) sh.getFields().set("Access-Control-Allow-Headers", config.getAllowedHeaders().stream().collect(Collectors.joining(", ")));
 
 			return false;
+		}
+
+		return true;
+	}
+
+	private boolean processCors(HttpRequestContext context) {HttpClientHeader ch = context.getClientHeader();
+		HttpServerHeader sh = context.getServerHeader();
+		CorsConfiguration config = getServer().getConfiguration().getDefaultCorsConfiguration(); // TODO: allow per path (pattern) CORS configuration
+		if(config == null) return true;
+
+		String origin = ch.getFields().getFirst("Origin");
+		if(origin != null) {
+			if(config.isAllowAllOrigins() || config.getAllowedOrigins().contains(origin)) {
+				sh.getFields().set("Access-Control-Allow-Origin", origin);
+			}else if(config.getAllowedOrigins().contains("*")) {
+				sh.getFields().set("Access-Control-Allow-Origin", "*");
+			}
+
+			if(!config.getExposedHeaders().isEmpty()) sh.getFields().set("Access-Control-Expose-Headers", config.getExposedHeaders().stream().collect(Collectors.joining(", ")));
 		}
 
 		return true;

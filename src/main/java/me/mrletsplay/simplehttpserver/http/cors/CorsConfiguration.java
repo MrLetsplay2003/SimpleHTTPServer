@@ -35,7 +35,7 @@ public class CorsConfiguration {
 
 	/**
 	 * Unconditionally allows all origins by setting the allowed origins to the request's origin.<br>
-	 * Overrides any configuration using {@link #addAllowedOrigins(String)}
+	 * Overrides any configuration using {@link #addAllowedOrigins(String...)}
 	 * @param allowAllOrigins Whether to allow all origins
 	 * @return This configuration
 	 */
@@ -49,8 +49,7 @@ public class CorsConfiguration {
 	}
 
 	/**
-	 * Adds origins to the list of allowed origins.<br>
-	 * For security reasons, by default the client will only be sent its own origin (if it is on the list). You can change this using {@link #sendAllAllowedOrigins(boolean)}
+	 * Adds origins to the list of allowed origins
 	 * @param origins The origins to allow
 	 * @return This configuration
 	 */
@@ -78,17 +77,17 @@ public class CorsConfiguration {
 	 * @param exposedHeaders The headers to expose
 	 * @return This configuration
 	 */
-	public CorsConfiguration addExposedHeader(String... exposedHeader) {
-		this.exposedHeaders.addAll(Arrays.asList(exposedHeader));
+	public CorsConfiguration addExposedHeaders(String... exposedHeaders) {
+		this.exposedHeaders.addAll(Arrays.asList(exposedHeaders));
 		return this;
 	}
 
 	/**
-	 * Removes an exposed header previously added using {@link #addExposedHeader(String)}
+	 * Removes exposed headers previously added using {@link #addExposedHeaders(String...)}
 	 * @param exposedHeaders The headers to not expose
 	 * @return This configuration
 	 */
-	public CorsConfiguration removeExposedHeader(String... exposedHeaders) {
+	public CorsConfiguration removeExposedHeaders(String... exposedHeaders) {
 		this.exposedHeaders.removeAll(Arrays.asList(exposedHeaders));
 		return this;
 	}
@@ -127,7 +126,7 @@ public class CorsConfiguration {
 
 	/**
 	 * Always send all allowed methods to the client, not just the ones for which a document is registered under the requested path
-	 * @param allowAllOrigins Whether to send all allowed origins
+	 * @param sendAllAllowedMethods Whether to send all allowed methods
 	 * @return This configuration
 	 */
 	public CorsConfiguration sendAllAllowedMethods(boolean sendAllAllowedMethods) {
