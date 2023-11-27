@@ -202,6 +202,7 @@ public class CorsConfiguration {
 	 */
 	public static CorsConfiguration createAllowAll() {
 		return new CorsConfiguration()
+			.addAllowedMethods(HttpRequestMethod.values())
 			.allowAllOrigins(true)
 			.addAllowedHeaders("*")
 			.allowCredentials(true);
