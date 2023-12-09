@@ -8,6 +8,10 @@ import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
 public class JsonResponse implements HttpResponse {
 
+	public static final JsonResponse
+		EMPTY_OBJECT = new JsonResponse(new JSONObject()),
+		EMPTY_ARRAY = new JsonResponse(new JSONArray());
+
 	private String json;
 
 	public JsonResponse(JSONObject object) {

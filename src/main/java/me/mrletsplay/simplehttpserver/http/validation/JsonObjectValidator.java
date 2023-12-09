@@ -1,15 +1,11 @@
 package me.mrletsplay.simplehttpserver.http.validation;
 
-import java.util.regex.Pattern;
-
 import me.mrletsplay.mrcore.json.JSONObject;
 import me.mrletsplay.mrcore.json.JSONType;
 import me.mrletsplay.simplehttpserver.http.validation.result.ValidationErrors;
 import me.mrletsplay.simplehttpserver.http.validation.result.ValidationResult;
 
 public class JsonObjectValidator extends AbstractValidator<JSONObject> {
-
-	private static final Pattern EMAIL_REGEX = Pattern.compile("^[a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[a-zA-Z0-9.-]+$");
 
 	private static ValidationRule<JSONObject> ruleRequire(String key) {
 		return o -> ValidationResult.check(o.has(key), key, "Missing attribute");
@@ -25,7 +21,7 @@ public class JsonObjectValidator extends AbstractValidator<JSONObject> {
 	private static ValidationRule<JSONObject> ruleEmail(String key) {
 		return ruleIsOfType(key, JSONType.STRING).bailAnd(o -> {
 			if(!o.has(key)) return ValidationResult.ok();
-			return ValidationResult.check(EMAIL_REGEX.matcher(o.getString(key)).matches(), key, "Not an email address");
+			return ValidationResult.check(ValidationUtil.isEmail(o.getString(key)), key, "Not an email address");
 		});
 	}
 
@@ -33,6 +29,15 @@ public class JsonObjectValidator extends AbstractValidator<JSONObject> {
 		return ruleIsOfType(key, JSONType.OBJECT).bailAnd(o -> {
 			if(!o.has(key)) return ValidationResult.ok();
 			ValidationResult result = validator.validate(o.getJSONObject(key));
+			if(result.isOk()) return result;
+			return ValidationResult.error(ValidationErrors.subElement(key, result.getErrors()));
+		});
+	}
+
+	private static ValidationRule<JSONObject> ruleSubElementMatches(String key, JsonArrayValidator validator) {
+		return ruleIsOfType(key, JSONType.ARRAY).bailAnd(o -> {
+			if(!o.has(key)) return ValidationResult.ok();
+			ValidationResult result = validator.validate(o.getJSONArray(key));
 			if(result.isOk()) return result;
 			return ValidationResult.error(ValidationErrors.subElement(key, result.getErrors()));
 		});
@@ -72,6 +77,17 @@ public class JsonObjectValidator extends AbstractValidator<JSONObject> {
 	}
 
 	public JsonObjectValidator optionalObject(String key, JsonObjectValidator validator) {
+		addRule(ruleSubElementMatches(key, validator));
+		return this;
+	}
+
+	public JsonObjectValidator requireArray(String key, JsonArrayValidator validator) {
+		addRule(ruleRequire(key)
+			.bailAnd(ruleSubElementMatches(key, validator)));
+		return this;
+	}
+
+	public JsonObjectValidator optionalArray(String key, JsonArrayValidator validator) {
 		addRule(ruleSubElementMatches(key, validator));
 		return this;
 	}

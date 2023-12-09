@@ -1,10 +1,10 @@
 package me.mrletsplay.simplehttpserver;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import me.mrletsplay.mrcore.http.HttpRequest;
 import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
