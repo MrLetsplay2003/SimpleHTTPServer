@@ -44,7 +44,17 @@ public class HttpClientHeader {
 		return new PostData(fields, postData);
 	}
 
+	/**
+	 * @param data
+	 * @return
+	 * @deprecated This method uses an implicit timeout of 0 (infinite). Use {@link #parse(InputStream, long)} instead.
+	 */
+	@Deprecated
 	public static HttpClientHeader parse(InputStream data) {
+		return parse(data, 0);
+	}
+
+	public static HttpClientHeader parse(InputStream data, long readTimeout) {
 		try {
 			String reqLine = readLine(data);
 			if(reqLine == null) return null;
@@ -73,11 +83,11 @@ public class HttpClientHeader {
 					return null;
 				}
 				postData = new byte[contLength];
-				int actualLen = data.read(postData);
-				int tries = 0;
-				while(actualLen != contLength) {
-					if(tries++ >= 10) return null; // Give up after 10 tries
-					actualLen += data.read(postData, actualLen, contLength - actualLen); // Retry reading remaining bytes until socket times out
+				long startReadTime = System.currentTimeMillis();
+				int readLen = data.read(postData);
+				while(readLen < contLength) {
+					readLen += data.read(postData, readLen, contLength - readLen); // Retry reading remaining bytes until socket times out
+					if(readTimeout > 0 && System.currentTimeMillis() - startReadTime > readTimeout) return null;
 				}
 			}
 

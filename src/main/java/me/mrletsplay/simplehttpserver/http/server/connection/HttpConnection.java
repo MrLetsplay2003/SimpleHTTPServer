@@ -96,7 +96,7 @@ public class HttpConnection extends AbstractConnection {
 
 		HttpServerHeader sh = null;
 
-		HttpClientHeader h = HttpClientHeader.parse(getSocket().getInputStream());
+		HttpClientHeader h = HttpClientHeader.parse(getSocket().getInputStream(), getServer().getConfiguration().getReadTimeout());
 		if(h == null) return false;
 
 		if(sh == null) sh = createResponse(h);
