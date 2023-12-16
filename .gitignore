@@ -2,8 +2,5 @@
 /target/
 /dependency-reduced-pom.xml
 /TEST/
-<<<<<<< HEAD
-=======
 /.settings/
 /.classpath
->>>>>>> origin/master
