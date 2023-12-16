@@ -48,7 +48,7 @@ public class DefaultErrorDocument implements HttpDocument {
 		for(StackTraceElement el : t.getStackTrace()) {
 			b.append("\n\t").append(el.toString());
 		}
-		if(t.getCause() != null) append(b, t, true);
+		if(t.getCause() != null) append(b, t.getCause(), true);
 	}
 
 	@Override

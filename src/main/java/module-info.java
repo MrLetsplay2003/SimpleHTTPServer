@@ -32,6 +32,7 @@ module simplehttpserver {
 	exports me.mrletsplay.simplehttpserver.http.websocket.buffer;
 	exports me.mrletsplay.simplehttpserver.http.websocket.frame;
 	exports me.mrletsplay.simplehttpserver.http.document;
+	exports me.mrletsplay.simplehttpserver.http.cors;
 
 	requires transitive me.mrletsplay.mrcore;
 	requires transitive org.slf4j;

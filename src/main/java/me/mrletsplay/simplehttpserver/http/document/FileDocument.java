@@ -12,17 +12,17 @@ import me.mrletsplay.simplehttpserver.server.ServerException;
 public class FileDocument implements HttpDocument {
 
 	private Path path;
-	private String mimeType;
+	private MimeType mimeType;
 
 	/**
-	 * @deprecated Use {@link #FileDocument(Path, String)} instead
+	 * @deprecated Use {@link #FileDocument(Path, MimeType)} instead
 	 * @param file
 	 * @param mimeType
 	 */
 	@Deprecated
 	public FileDocument(File file, String mimeType) {
 		this.path = file.toPath();
-		this.mimeType = mimeType;
+		this.mimeType = MimeType.of(mimeType);
 	}
 
 	/**
@@ -40,7 +40,7 @@ public class FileDocument implements HttpDocument {
 	 * @param path The path to the file
 	 * @param mimeType The MIME type of the file
 	 */
-	public FileDocument(Path path, String mimeType) {
+	public FileDocument(Path path, MimeType mimeType) {
 		this.path = path;
 		this.mimeType = mimeType;
 	}
@@ -52,7 +52,7 @@ public class FileDocument implements HttpDocument {
 	 * @see Files#probeContentType(Path)
 	 */
 	public FileDocument(Path path) throws IOException {
-		this(path, Files.probeContentType(path));
+		this(path, MimeType.of(Files.probeContentType(path)));
 	}
 
 	/**
@@ -74,7 +74,7 @@ public class FileDocument implements HttpDocument {
 	/**
 	 * @return The MIME type of the file, or <code>null</code> for unknown type
 	 */
-	public String getMimeType() {
+	public MimeType getMimeType() {
 		return mimeType;
 	}
 
@@ -88,7 +88,7 @@ public class FileDocument implements HttpDocument {
 
 	@Override
 	public void createContent() {
-		HttpRequestContext.getCurrentContext().getServerHeader().setContent(MimeType.of(mimeType), loadContent());
+		HttpRequestContext.getCurrentContext().getServerHeader().setContent(mimeType, loadContent());
 	}
 
 }

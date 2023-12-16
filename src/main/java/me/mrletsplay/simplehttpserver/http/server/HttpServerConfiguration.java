@@ -1,8 +1,11 @@
 package me.mrletsplay.simplehttpserver.http.server;
 
+import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import me.mrletsplay.simplehttpserver.http.cors.CorsConfiguration;
 import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
 import me.mrletsplay.simplehttpserver.server.impl.AbstractServerConfiguration;
 
@@ -11,12 +14,16 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 	protected boolean debugMode;
 	protected boolean handleOptionsRequests;
 	protected int maxClientHeaderSize;
+	protected CorsConfiguration defaultCorsConfiguration;
+	protected long readTimeout;
 
-	protected HttpServerConfiguration(String host, int port, Logger logger, int poolSize, boolean debugMode, boolean handleOptionsRequests, int maxClientHeaderSize) {
+	protected HttpServerConfiguration(String host, int port, Logger logger, int poolSize, boolean debugMode, boolean handleOptionsRequests, int maxClientHeaderSize, CorsConfiguration defaultCorsConfiguration, long readTimeout) {
 		super(host, port, logger, poolSize);
 		this.debugMode = debugMode;
 		this.handleOptionsRequests = handleOptionsRequests;
 		this.maxClientHeaderSize = maxClientHeaderSize;
+		this.defaultCorsConfiguration = defaultCorsConfiguration;
+		this.readTimeout = readTimeout;
 	}
 
 	public boolean isDebugMode() {
@@ -31,11 +38,21 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 		return maxClientHeaderSize;
 	}
 
+	public CorsConfiguration getDefaultCorsConfiguration() {
+		return defaultCorsConfiguration;
+	}
+
+	public long getReadTimeout() {
+		return readTimeout;
+	}
+
 	public static class Builder extends AbstractServerConfigurationBuilder<HttpServerConfiguration, Builder> {
 
 		protected boolean debugMode;
 		protected boolean handleOptionsRequests;
 		protected int maxClientHeaderSize;
+		protected CorsConfiguration defaultCorsConfiguration;
+		protected long readTimeout;
 
 		public Builder() {
 			this.poolSize = Runtime.getRuntime().availableProcessors();
@@ -58,6 +75,21 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 			return this;
 		}
 
+		public Builder defaultCorsConfiguration(CorsConfiguration defaultCorsConfiguration) {
+			this.defaultCorsConfiguration = defaultCorsConfiguration;
+			return this;
+		}
+
+		public Builder readTimeout(long readTimeout) {
+			this.readTimeout = readTimeout;
+			return this;
+		}
+
+		public Builder readTimeout(long timeout, TimeUnit unit) {
+			this.readTimeout = unit.toMillis(timeout);
+			return this;
+		}
+
 		protected void verify() throws IllegalStateException {
 			if(host == null) throw new IllegalStateException("Host must be set");
 			if(port <= 0 || port > 65535) throw new IllegalStateException("Port must be set to a value between 1 and 65535");
@@ -69,7 +101,7 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 		@Override
 		public HttpServerConfiguration create() throws IllegalStateException {
 			verify();
-			return new HttpServerConfiguration(host, port, logger, poolSize, debugMode, handleOptionsRequests, maxClientHeaderSize);
+			return new HttpServerConfiguration(host, port, logger, poolSize, debugMode, handleOptionsRequests, maxClientHeaderSize, defaultCorsConfiguration, readTimeout);
 		}
 
 	}
