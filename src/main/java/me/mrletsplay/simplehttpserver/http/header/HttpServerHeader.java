@@ -23,8 +23,8 @@ public class HttpServerHeader {
 		totalContentLength;
 
 	private boolean
-		compressionEnabled,
-		allowByteRanges;
+		compressionEnabled, // TODO: move to request context
+		allowByteRanges; // TODO: move to request context
 
 	public HttpServerHeader(HttpProtocolVersion protocolVersion, HttpStatusCode statusCode, HttpHeaderFields fields) {
 		this.protocolVersion = protocolVersion;

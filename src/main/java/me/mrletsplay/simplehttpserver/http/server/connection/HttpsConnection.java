@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,10 +24,18 @@ public class HttpsConnection extends HttpConnection {
 
 	private SSLEngine engine;
 
-	private ByteBuffer myAppData, myNetData, peerAppData, peerNetData;
+	private boolean handshakeDone;
+
+	private ByteBuffer
+		myAppData, // Read
+		myNetData, // Read
+		peerAppData, // Write
+		peerNetData; // Write
 
 	public HttpsConnection(HttpServer server, SocketChannel socket, SSLContext sslContext) {
 		super(server, socket);
+
+		handshakeDone = false;
 
 		engine = sslContext.createSSLEngine();
 		engine.setUseClientMode(false);
@@ -52,6 +61,30 @@ public class HttpsConnection extends HttpConnection {
 		return true;
 	}
 
+	private void processAppData() throws IOException {
+		if(!getSelectionKey().isValid()) return;
+
+		int ops = getSelectionKey().interestOps();
+		boolean read = (ops & SelectionKey.OP_READ) == SelectionKey.OP_READ;
+		boolean write = (ops & SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE;
+
+		System.out.printf("Process read: %s, write: %s\n", read, write);
+
+		peerAppData.flip();
+		System.out.println("Read: " + read + ", " + peerAppData.remaining());
+		if(read && peerAppData.hasRemaining()) {
+			readData(peerAppData);
+		}
+		peerAppData.compact();
+
+		myAppData.compact();
+		if(write && myAppData.hasRemaining()) {
+			writeData(myAppData);
+		}
+		myAppData.flip();
+		System.out.println("AFTER WRITE: " + myAppData.remaining());
+	}
+
 	@Override
 	public boolean canReadData() {
 		return super.canReadData() || peerNetData.hasRemaining();
@@ -59,10 +92,9 @@ public class HttpsConnection extends HttpConnection {
 
 	@Override
 	public void readData() throws IOException {
-		System.out.println("R: " + engine.getHandshakeStatus());
+		System.out.println("--- R: " + engine.getHandshakeStatus());
 
-		if(engine.getHandshakeStatus() != HandshakeStatus.FINISHED
-			&& engine.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING) {
+		if(!handshakeDone) {
 			performHandshake(true, false);
 			setHandshakeInterestOps();
 			return;
@@ -74,76 +106,67 @@ public class HttpsConnection extends HttpConnection {
 			return;
 		}
 
-		peerNetData.flip();
-		convertPeerData();
-		peerNetData.compact();
+		unwrapPeerData();
+		processAppData();
 	}
 
-	protected void convertPeerData() throws IOException {
-		while((getSelectionKey().interestOps() & SelectionKey.OP_READ) == SelectionKey.OP_READ && peerNetData.hasRemaining()) {
+	protected void unwrapPeerData() throws IOException {
+		peerNetData.flip();
+		while(peerNetData.hasRemaining()) {
 			System.out.println(peerNetData.remaining());
 			SSLEngineResult res = engine.unwrap(peerNetData, peerAppData);
 			if(res.getStatus() != Status.OK) {
 				System.out.println(res.getStatus());
 				handleHandshakeStatus(res.getStatus());
-				return;
+				break;
 			}
-
-
-			peerAppData.flip();
-			System.out.println(new String(peerAppData.array()));
-			// TODO: turn read/write routine into generic loop for both so it behaves like selectionkey would (check flags and only run selected methods)
-			readData(peerAppData);
-			peerAppData.compact();
 		}
+		peerNetData.compact();
+		System.out.println("read: " + new String(peerAppData.array(), 0, peerAppData.position()));
 	}
 
 	@Override
 	public boolean canWriteData() {
-		System.out.println("CanWrite");
 		return super.canWriteData() || myNetData.hasRemaining();
 	}
 
 	@Override
 	public void writeData() throws IOException {
-		System.out.println("W: " + engine.getHandshakeStatus());
+		System.out.println("--- W: " + engine.getHandshakeStatus());
 
-		if(engine.getHandshakeStatus() != HandshakeStatus.FINISHED
-			&& engine.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING) {
+		if(!handshakeDone) {
 			performHandshake(false, true);
 			setHandshakeInterestOps();
 			return;
 		}
 
-		if(!myNetData.hasRemaining()) {
-			myNetData.clear();
-			fillAppData();
-			myNetData.flip();
-		}
+		processAppData();
+		wrapMyData();
 
-		System.out.println(myNetData.remaining());
-
+		System.out.println("W: " + myNetData.remaining());
 		if(getSocket().write(myNetData) == -1) {
 			close();
 			return;
 		}
+		myNetData.compact();
 
-		if(!myAppData.hasRemaining() && !myNetData.hasRemaining()) {
+		if(!myNetData.hasRemaining()) {
 			finishWrite();
 		}
 	}
 
-	protected void fillAppData() throws IOException {
-		if(!myAppData.hasRemaining()) {
-			myAppData.clear();
-			writeData(myAppData);
-			myAppData.flip();
+	protected void wrapMyData() throws IOException {
+		myNetData.compact();
+		while(myAppData.hasRemaining()) {
+			System.out.println("FILLING: " + myAppData.remaining());
+			System.out.println(new String(myAppData.array(), myAppData.position(), myAppData.remaining(), StandardCharsets.UTF_8));
+			SSLEngineResult res = engine.wrap(myAppData, myNetData);
+			if(res.getStatus() != Status.OK) {
+				handleHandshakeStatus(res.getStatus());
+				break;
+			}
 		}
-
-		System.out.println("FILLING: " + myAppData.remaining());
-		System.out.println(new String(myAppData.array()));
-		SSLEngineResult res = engine.wrap(myAppData, myNetData);
-		handleHandshakeStatus(res.getStatus());
+		myNetData.flip();
 	}
 
 	protected void setHandshakeInterestOps() {
@@ -159,10 +182,6 @@ public class HttpsConnection extends HttpConnection {
 			case NEED_WRAP:
 				key.interestOps(SelectionKey.OP_WRITE);
 				break;
-			case FINISHED:
-			case NOT_HANDSHAKING:
-				key.interestOps(SelectionKey.OP_READ);
-				break;
 			default:
 				break;
 		}
@@ -170,11 +189,22 @@ public class HttpsConnection extends HttpConnection {
 		if(myNetData.hasRemaining()) key.interestOpsOr(SelectionKey.OP_WRITE);
 	}
 
+	protected void finishHandshake() {
+		handshakeDone = true;
+		getSelectionKey().interestOps(SelectionKey.OP_READ);
+	}
+
 	protected void performHandshake(boolean canRead, boolean canWrite) throws IOException {
 		if (canWrite && myNetData.hasRemaining()) {
 			if(getSocket().write(myNetData) == -1) {
 				close();
 				return;
+			}
+			myNetData.compact();
+			myNetData.flip();
+
+			if(!myNetData.hasRemaining() && engine.getHandshakeStatus() == HandshakeStatus.NOT_HANDSHAKING) {
+				finishHandshake();
 			}
 
 			return;
@@ -185,14 +215,9 @@ public class HttpsConnection extends HttpConnection {
 			return;
 		}
 
-		while(engine.getHandshakeStatus() != HandshakeStatus.FINISHED
-			&& engine.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING) {
-			System.out.println("S: " + engine.getHandshakeStatus());
+		while(engine.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING) {
+			System.out.println("HS: " + engine.getHandshakeStatus());
 			switch (engine.getHandshakeStatus()) {
-				case FINISHED:
-				case NOT_HANDSHAKING:
-					convertPeerData();
-					return;
 				case NEED_UNWRAP:
 				{
 					peerNetData.flip();
@@ -244,9 +269,9 @@ public class HttpsConnection extends HttpConnection {
 
 					return;
 				}
-				case NEED_UNWRAP_AGAIN: // Doesn't apply here
 				default:
-					break;
+					// Doesn't apply here
+					return;
 			}
 		}
 	}

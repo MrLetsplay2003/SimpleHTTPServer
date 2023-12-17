@@ -235,7 +235,7 @@ public class HttpConnection extends AbstractConnection {
 			if(postProcessor != null) process(ctx, postProcessor);
 
 			if(sh.isAllowByteRanges()) process(ctx, this::applyRanges);
-			if(sh.isCompressionEnabled()) process(ctx, this::applyCompression);
+//			if(sh.isCompressionEnabled()) process(ctx, this::applyCompression); TODO: enable
 
 			sh = ctx.getServerHeader();
 		}catch(Exception e) {
