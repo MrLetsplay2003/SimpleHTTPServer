@@ -58,6 +58,11 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 		}
 
 		@Override
+		public Builder logger(Logger logger) {
+			return (Builder) super.logger(logger);
+		}
+
+		@Override
 		public Builder debugMode(boolean debugMode) {
 			return (Builder) super.debugMode(debugMode);
 		}
