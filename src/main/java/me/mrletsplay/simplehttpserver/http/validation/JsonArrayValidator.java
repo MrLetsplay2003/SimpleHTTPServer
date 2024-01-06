@@ -18,6 +18,16 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 		};
 	}
 
+	private static ValidationRule<JSONArray> ruleAllOfType(JSONType type) {
+		return a -> {
+			ValidationResult result = ValidationResult.ok();
+			for(int i = 0; i < a.size(); i++) {
+				result = result.combine(ValidationResult.check(a.isOfType(i, type), String.valueOf(i), "Element must be of type " + type));
+			}
+			return result;
+		};
+	}
+
 	private static ValidationRule<JSONArray> ruleEmail(int index) {
 		return ruleIsOfType(index, JSONType.STRING).bailAnd(a -> {
 			if(!a.has(index)) return ValidationResult.ok();
@@ -89,6 +99,52 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 
 	public JsonArrayValidator optionalArray(int index, JsonArrayValidator validator) {
 		addRule(ruleSubElementMatches(index, validator));
+		return this;
+	}
+
+	public JsonArrayValidator requireMinimumSize(int size) {
+		addRule(a -> ValidationResult.check(a.size() >= size, "0", "Array must have at least " + size + " element(s)"));
+		return this;
+	}
+
+	public JsonArrayValidator requireMaximumSize(int size) {
+		addRule(a -> ValidationResult.check(a.size() <= size, "0", "Array must have at most " + size + " element(s)"));
+		return this;
+	}
+
+	public JsonArrayValidator requireSize(int size) {
+		addRule(a -> ValidationResult.check(a.size() == size, "0", "Array must have exactly " + size + " element(s)"));
+		return this;
+	}
+
+	public JsonArrayValidator requireElementType(JSONType type) {
+		addRule(ruleAllOfType(type));
+		return this;
+	}
+
+	public JsonArrayValidator requireElementObjects(JsonObjectValidator validator) {
+		addRule(ruleAllOfType(JSONType.OBJECT).and(a -> {
+			ValidationResult result = ValidationResult.ok();
+			for(int i = 0; i < a.size(); i++) {
+				if(!a.isOfType(i, JSONType.OBJECT)) continue;
+				ValidationResult r = validator.validate(a.getJSONObject(i));
+				result = result.combine(r);
+			}
+			return result;
+		}));
+		return this;
+	}
+
+	public JsonArrayValidator requireElementArrays(JsonArrayValidator validator) {
+		addRule(ruleAllOfType(JSONType.ARRAY).and(a -> {
+			ValidationResult result = ValidationResult.ok();
+			for(int i = 0; i < a.size(); i++) {
+				if(!a.isOfType(i, JSONType.ARRAY)) continue;
+				ValidationResult r = validator.validate(a.getJSONArray(i));
+				result = result.combine(r);
+			}
+			return result;
+		}));
 		return this;
 	}
 

@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -69,13 +70,17 @@ public class ValidationErrors {
 		if(errors.length == 0) throw new IllegalArgumentException("Need at least one error");
 		if(errors.length == 1) return errors[0];
 
-		var newErrors = Arrays.stream(errors).flatMap(e -> e.errors.entrySet().stream())
+		var newErrors = Arrays.stream(errors)
+			.filter(Objects::nonNull)
+			.flatMap(e -> e.errors.entrySet().stream())
 			.collect(Collectors.toMap(
 				e -> e.getKey(),
 				e -> (List<String>) new ArrayList<>(e.getValue()),
 				(a, b) -> { a.addAll(b); return a; },
 				HashMap::new));
-		var newSubElements = Arrays.stream(errors).flatMap(e -> e.subElements.entrySet().stream())
+		var newSubElements = Arrays.stream(errors)
+			.filter(Objects::nonNull)
+			.flatMap(e -> e.subElements.entrySet().stream())
 			.collect(Collectors.toMap(
 				e -> e.getKey(),
 				e -> e.getValue().copy(),

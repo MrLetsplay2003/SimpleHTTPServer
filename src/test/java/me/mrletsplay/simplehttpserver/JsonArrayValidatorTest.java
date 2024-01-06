@@ -42,6 +42,7 @@ public class JsonArrayValidatorTest {
 			.requireEmail(0);
 
 		assertTrue(validator.validate(new JSONArray("[\"alice@example.com\"]")).isOk());
+
 		assertFalse(validator.validate(new JSONArray("[\"not an email\"]")).isOk());
 		assertFalse(validator.validate(new JSONArray("[false]")).isOk());
 	}
@@ -53,6 +54,7 @@ public class JsonArrayValidatorTest {
 				.require("number", JSONType.DECIMAL));
 
 		assertTrue(validator.validate(new JSONArray("[{\"number\":1.0}]")).isOk());
+
 		assertFalse(validator.validate(new JSONArray("[{}]")).isOk());
 		assertFalse(validator.validate(new JSONArray("[{\"number\":false}]")).isOk());
 	}
@@ -61,12 +63,46 @@ public class JsonArrayValidatorTest {
 	public void testArray() {
 		JsonArrayValidator validator = new JsonArrayValidator()
 			.requireArray(0, new JsonArrayValidator()
-				.require(0, JSONType.DECIMAL));
+				.require(0, JSONType.DECIMAL))
+			.requireMaximumSize(2);
 
 		assertTrue(validator.validate(new JSONArray("[[1.0]]")).isOk());
+		assertTrue(validator.validate(new JSONArray("[[1.0], 1.0]")).isOk());
+
 		assertFalse(validator.validate(new JSONArray("[]")).isOk());
 		assertFalse(validator.validate(new JSONArray("[[]]")).isOk());
 		assertFalse(validator.validate(new JSONArray("[[false]]")).isOk());
+		assertFalse(validator.validate(new JSONArray("[[1.0], 1.0, 2.0]")).isOk());
+	}
+
+	@Test
+	public void testArrayElements() {
+		JsonArrayValidator validator = new JsonArrayValidator()
+			.requireElementArrays(new JsonArrayValidator()
+				.require(0, JSONType.STRING)
+				.require(1, JSONType.INTEGER));
+
+		assertTrue(validator.validate(new JSONArray("[[\"hello\", 1], [\"test\", 42]]")).isOk());
+		assertTrue(validator.validate(new JSONArray("[]")).isOk());
+
+		assertFalse(validator.validate(new JSONArray("[[]]")).isOk());
+		assertFalse(validator.validate(new JSONArray("[[false]]")).isOk());
+		assertFalse(validator.validate(new JSONArray("[[\"hello\", 1], 1]")).isOk());
+	}
+
+	@Test
+	public void testArrayElements2() {
+		JsonArrayValidator validator = new JsonArrayValidator()
+			.requireElementObjects(new JsonObjectValidator()
+				.require("a", JSONType.STRING)
+				.require("b", JSONType.INTEGER));
+
+		assertTrue(validator.validate(new JSONArray("[{\"a\":\"hello\", \"b\":1}, {\"a\":\"test\", \"b\":42}]")).isOk());
+		assertTrue(validator.validate(new JSONArray("[]")).isOk());
+
+		assertFalse(validator.validate(new JSONArray("[{}]")).isOk());
+		assertFalse(validator.validate(new JSONArray("[{\"a\":false}]")).isOk());
+		assertFalse(validator.validate(new JSONArray("[{\"b\":1}]")).isOk());
 	}
 
 }
