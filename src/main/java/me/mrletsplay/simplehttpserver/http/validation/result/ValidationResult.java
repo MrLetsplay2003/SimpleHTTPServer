@@ -32,6 +32,11 @@ public class ValidationResult {
 		return error(ValidationErrors.combine(errors, other.errors));
 	}
 
+	public ValidationResult asSubElement(String key) {
+		if(isOk()) return this;
+		return error(ValidationErrors.subElement(key, errors));
+	}
+
 	public static ValidationResult error(ValidationErrors errors) {
 		return new ValidationResult(false, errors);
 	}

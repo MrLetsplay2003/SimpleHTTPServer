@@ -128,7 +128,7 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 			for(int i = 0; i < a.size(); i++) {
 				if(!a.isOfType(i, JSONType.OBJECT)) continue;
 				ValidationResult r = validator.validate(a.getJSONObject(i));
-				result = result.combine(r);
+				result = result.combine(r.asSubElement(String.valueOf(i)));
 			}
 			return result;
 		}));
@@ -141,7 +141,7 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 			for(int i = 0; i < a.size(); i++) {
 				if(!a.isOfType(i, JSONType.ARRAY)) continue;
 				ValidationResult r = validator.validate(a.getJSONArray(i));
-				result = result.combine(r);
+				result = result.combine(r.asSubElement(String.valueOf(i)));
 			}
 			return result;
 		}));
