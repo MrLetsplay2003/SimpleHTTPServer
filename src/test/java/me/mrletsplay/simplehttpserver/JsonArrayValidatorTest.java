@@ -82,6 +82,7 @@ public class JsonArrayValidatorTest {
 				.require(0, JSONType.STRING)
 				.require(1, JSONType.INTEGER));
 
+		assertTrue(validator.validate(new JSONArray("[null]")).isOk());
 		assertTrue(validator.validate(new JSONArray("[[\"hello\", 1], [\"test\", 42]]")).isOk());
 		assertTrue(validator.validate(new JSONArray("[]")).isOk());
 
@@ -93,6 +94,7 @@ public class JsonArrayValidatorTest {
 	@Test
 	public void testArrayElements2() {
 		JsonArrayValidator validator = new JsonArrayValidator()
+			.requireAllNonNull()
 			.requireElementObjects(new JsonObjectValidator()
 				.require("a", JSONType.STRING)
 				.require("b", JSONType.INTEGER));
@@ -100,6 +102,7 @@ public class JsonArrayValidatorTest {
 		assertTrue(validator.validate(new JSONArray("[{\"a\":\"hello\", \"b\":1}, {\"a\":\"test\", \"b\":42}]")).isOk());
 		assertTrue(validator.validate(new JSONArray("[]")).isOk());
 
+		assertFalse(validator.validate(new JSONArray("[null]")).isOk());
 		assertFalse(validator.validate(new JSONArray("[{}]")).isOk());
 		assertFalse(validator.validate(new JSONArray("[{\"a\":false}]")).isOk());
 		assertFalse(validator.validate(new JSONArray("[{\"b\":1}]")).isOk());

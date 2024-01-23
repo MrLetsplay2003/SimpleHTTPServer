@@ -1,6 +1,7 @@
 package me.mrletsplay.simplehttpserver.http.validation;
 
 import me.mrletsplay.mrcore.json.JSONArray;
+import me.mrletsplay.mrcore.json.JSONObject;
 import me.mrletsplay.mrcore.json.JSONType;
 import me.mrletsplay.simplehttpserver.http.validation.result.ValidationErrors;
 import me.mrletsplay.simplehttpserver.http.validation.result.ValidationResult;
@@ -11,10 +12,24 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 		return a -> ValidationResult.check(a.has(index), String.valueOf(index), "Missing element");
 	}
 
+	private static ValidationRule<JSONArray> ruleNonNull(int index) {
+		return a -> ValidationResult.check(!a.has(index) || a.get(index) != null, String.valueOf(index), "Element must not be null");
+	}
+
 	private static ValidationRule<JSONArray> ruleIsOfType(int index, JSONType type) {
 		return a -> {
 			if(!a.has(index)) return ValidationResult.ok();
 			return ValidationResult.check(a.isOfType(index, type), String.valueOf(index), "Element must be of type " + type);
+		};
+	}
+
+	private static ValidationRule<JSONArray> ruleAllNonNull() {
+		return a -> {
+			ValidationResult result = ValidationResult.ok();
+			for(int i = 0; i < a.size(); i++) {
+				result = result.combine(ValidationResult.check(a.get(i) != null, String.valueOf(i), "Element must not be null"));
+			}
+			return result;
 		};
 	}
 
@@ -31,14 +46,18 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 	private static ValidationRule<JSONArray> ruleEmail(int index) {
 		return ruleIsOfType(index, JSONType.STRING).bailAnd(a -> {
 			if(!a.has(index)) return ValidationResult.ok();
-			return ValidationResult.check(ValidationUtil.isEmail(a.getString(index)), String.valueOf(index), "Not an email address");
+			String email = a.getString(index);
+			if(email == null) return ValidationResult.ok();
+			return ValidationResult.check(ValidationUtil.isEmail(email), String.valueOf(index), "Not an email address");
 		});
 	}
 
 	private static ValidationRule<JSONArray> ruleSubElementMatches(int index, JsonObjectValidator validator) {
 		return ruleIsOfType(index, JSONType.OBJECT).bailAnd(a -> {
 			if(!a.has(index)) return ValidationResult.ok();
-			ValidationResult result = validator.validate(a.getJSONObject(index));
+			JSONObject object = a.getJSONObject(index);
+			if(object == null) return ValidationResult.ok();
+			ValidationResult result = validator.validate(object);
 			if(result.isOk()) return result;
 			return ValidationResult.error(ValidationErrors.subElement(String.valueOf(index), result.getErrors()));
 		});
@@ -47,7 +66,9 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 	private static ValidationRule<JSONArray> ruleSubElementMatches(int index, JsonArrayValidator validator) {
 		return ruleIsOfType(index, JSONType.ARRAY).bailAnd(a -> {
 			if(!a.has(index)) return ValidationResult.ok();
-			ValidationResult result = validator.validate(a.getJSONArray(index));
+			JSONArray array = a.getJSONArray(index);
+			if(array == null) return ValidationResult.ok();
+			ValidationResult result = validator.validate(array);
 			if(result.isOk()) return result;
 			return ValidationResult.error(ValidationErrors.subElement(String.valueOf(index), result.getErrors()));
 		});
@@ -58,14 +79,33 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 		return this;
 	}
 
+	public JsonArrayValidator requireNonNull(int index) {
+		addRule(ruleRequire(index)
+			.bailAnd(ruleNonNull(index)));
+		return this;
+	}
+
 	public JsonArrayValidator require(int index, JSONType type) {
 		addRule(ruleRequire(index)
 			.bailAnd(ruleIsOfType(index, type)));
 		return this;
 	}
 
+	public JsonArrayValidator requireNonNull(int index, JSONType type) {
+		addRule(ruleRequire(index)
+			.bailAnd(ruleNonNull(index))
+			.bailAnd(ruleIsOfType(index, type)));
+		return this;
+	}
+
 	public JsonArrayValidator optional(int index, JSONType type) {
 		addRule(ruleIsOfType(index, type));
+		return this;
+	}
+
+	public JsonArrayValidator optionalNonNull(int index, JSONType type) {
+		addRule(ruleNonNull(index)
+			.bailAnd(ruleIsOfType(index, type)));
 		return this;
 	}
 
@@ -80,6 +120,19 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 		return this;
 	}
 
+	public JsonArrayValidator requireEmailNonNull(int index) {
+		addRule(ruleRequire(index)
+			.bailAnd(ruleNonNull(index))
+			.bailAnd(ruleEmail(index)));
+		return this;
+	}
+
+	public JsonArrayValidator optionalEmailNonNull(int index) {
+		addRule(ruleNonNull(index)
+			.bailAnd(ruleEmail(index)));
+		return this;
+	}
+
 	public JsonArrayValidator requireObject(int index, JsonObjectValidator validator) {
 		addRule(ruleRequire(index)
 			.bailAnd(ruleSubElementMatches(index, validator)));
@@ -91,6 +144,19 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 		return this;
 	}
 
+	public JsonArrayValidator requireObjectNonNull(int index, JsonObjectValidator validator) {
+		addRule(ruleRequire(index)
+			.bailAnd(ruleNonNull(index))
+			.bailAnd(ruleSubElementMatches(index, validator)));
+		return this;
+	}
+
+	public JsonArrayValidator optionalObjectNonNull(int index, JsonObjectValidator validator) {
+		addRule(ruleNonNull(index)
+			.bailAnd(ruleSubElementMatches(index, validator)));
+		return this;
+	}
+
 	public JsonArrayValidator requireArray(int index, JsonArrayValidator validator) {
 		addRule(ruleRequire(index)
 			.bailAnd(ruleSubElementMatches(index, validator)));
@@ -99,6 +165,19 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 
 	public JsonArrayValidator optionalArray(int index, JsonArrayValidator validator) {
 		addRule(ruleSubElementMatches(index, validator));
+		return this;
+	}
+
+	public JsonArrayValidator requireArrayNonNull(int index, JsonArrayValidator validator) {
+		addRule(ruleRequire(index)
+			.bailAnd(ruleNonNull(index))
+			.bailAnd(ruleSubElementMatches(index, validator)));
+		return this;
+	}
+
+	public JsonArrayValidator optionalArrayNonNull(int index, JsonArrayValidator validator) {
+		addRule(ruleNonNull(index)
+			.bailAnd(ruleSubElementMatches(index, validator)));
 		return this;
 	}
 
@@ -117,6 +196,11 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 		return this;
 	}
 
+	public JsonArrayValidator requireAllNonNull() {
+		addRule(ruleAllNonNull());
+		return this;
+	}
+
 	public JsonArrayValidator requireElementType(JSONType type) {
 		addRule(ruleAllOfType(type));
 		return this;
@@ -127,7 +211,9 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 			ValidationResult result = ValidationResult.ok();
 			for(int i = 0; i < a.size(); i++) {
 				if(!a.isOfType(i, JSONType.OBJECT)) continue;
-				ValidationResult r = validator.validate(a.getJSONObject(i));
+				JSONObject object = a.getJSONObject(i);
+				if(object == null) return ValidationResult.ok();
+				ValidationResult r = validator.validate(object);
 				result = result.combine(r.asSubElement(String.valueOf(i)));
 			}
 			return result;
@@ -140,7 +226,9 @@ public class JsonArrayValidator extends AbstractValidator<JSONArray> {
 			ValidationResult result = ValidationResult.ok();
 			for(int i = 0; i < a.size(); i++) {
 				if(!a.isOfType(i, JSONType.ARRAY)) continue;
-				ValidationResult r = validator.validate(a.getJSONArray(i));
+				JSONArray array = a.getJSONArray(i);
+				if(array == null) return ValidationResult.ok();
+				ValidationResult r = validator.validate(array);
 				result = result.combine(r.asSubElement(String.valueOf(i)));
 			}
 			return result;

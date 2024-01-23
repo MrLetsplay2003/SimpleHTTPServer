@@ -49,10 +49,11 @@ public class JsonObjectValidatorTest {
 	@Test
 	public void testObject() {
 		JsonObjectValidator validator = new JsonObjectValidator()
-			.requireObject("data", new JsonObjectValidator()
+			.requireObjectNonNull("data", new JsonObjectValidator()
 				.require("number", JSONType.DECIMAL));
 
 		assertTrue(validator.validate(new JSONObject("{\"data\":{\"number\":1.0}}")).isOk());
+		assertFalse(validator.validate(new JSONObject("{\"data\":null}")).isOk());
 		assertFalse(validator.validate(new JSONObject("{\"data\":{}}")).isOk());
 		assertFalse(validator.validate(new JSONObject("{\"data\":{\"number\":false}}")).isOk());
 	}
@@ -64,6 +65,7 @@ public class JsonObjectValidatorTest {
 				.require(0, JSONType.DECIMAL));
 
 		assertTrue(validator.validate(new JSONObject("{\"data\":[1.0]}")).isOk());
+		assertTrue(validator.validate(new JSONObject("{\"data\":null}")).isOk());
 		assertFalse(validator.validate(new JSONObject("{\"data\":[]}")).isOk());
 		assertFalse(validator.validate(new JSONObject("{\"data\":[false]}")).isOk());
 	}
