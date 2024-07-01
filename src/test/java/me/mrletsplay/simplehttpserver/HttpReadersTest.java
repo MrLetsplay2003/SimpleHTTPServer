@@ -17,11 +17,14 @@ public class HttpReadersTest {
 	public void testClientHeaderReader() {
 		String httpHeader = "GET / HTTP/1.1\r\n"
 			+ "Host: example.com\r\n"
+			+ "X-Amogus: sus\r\n"
+			+ "a: b\r\n"
+			+ "a: c\r\n"
 			+ "\r\n";
 
 		Reader<HttpClientHeader> reader = HttpReaders.clientHeaderReader();
 		ReaderInstance<HttpClientHeader> readerInstance = reader.createInstance();
-		readerInstance.onFinished(header -> System.out.println(header.getFields().getFirst("Host")));
+		readerInstance.onFinished(header -> System.out.println(header.getFields().getRaw()));
 		try {
 			readerInstance.read(ByteBuffer.wrap(httpHeader.getBytes(StandardCharsets.UTF_8)));
 		} catch (IOException e) {

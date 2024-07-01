@@ -276,7 +276,7 @@ public class Operations {
 
 			if(current.read(instance, buf)) {
 				current = null;
-				if(!condition.get(instance)) return true;
+				if(condition.get(instance)) return true;
 			}
 
 			return false;

@@ -124,7 +124,7 @@ public class ReaderImpl<T> implements Reader<T> {
 
 	@Override
 	public <O> Ref<List<O>> loopUntil(Ref<Boolean> condition, Reader<O> body) {
-		SimpleRef<O> current = SimpleRef.createRewritable();
+		SimpleRef<O> current = SimpleRef.create();
 		SimpleRef<List<O>> ref = SimpleRef.create();
 		operations.add(Operations.run(instance -> ref.set(instance, new ArrayList<>())).then(Operations.loopUntil(condition, Operations.read(current, body).thenRun(instance -> ref.get(instance).add(current.get(instance))))));
 		return ref;
@@ -238,8 +238,7 @@ public class ReaderImpl<T> implements Reader<T> {
 		}
 
 		@Override
-		public <R> void setRef(Ref<R> ref, R value, boolean allowOverwrite) throws IllegalStateException {
-			if(!allowOverwrite && refValues.containsKey(ref)) throw new IllegalStateException("Ref is already set");
+		public <R> void setRef(Ref<R> ref, R value) throws IllegalStateException {
 			refValues.put(ref, value);
 		}
 

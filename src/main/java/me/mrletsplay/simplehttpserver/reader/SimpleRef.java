@@ -2,14 +2,10 @@ package me.mrletsplay.simplehttpserver.reader;
 
 public class SimpleRef<T> implements Ref<T> {
 
-	private boolean rewritable;
-
-	private SimpleRef(boolean rewritable) {
-		this.rewritable = rewritable;
-	}
+	private SimpleRef() {}
 
 	public void set(ReaderInstance<?> instance, T value) throws IllegalStateException {
-		instance.setRef(this, value, rewritable);
+		instance.setRef(this, value);
 	}
 
 	@Override
@@ -18,11 +14,7 @@ public class SimpleRef<T> implements Ref<T> {
 	}
 
 	public static <T> SimpleRef<T> create() {
-		return new SimpleRef<>(false);
-	}
-
-	public static <T> SimpleRef<T> createRewritable() {
-		return new SimpleRef<>(true);
+		return new SimpleRef<>();
 	}
 
 }

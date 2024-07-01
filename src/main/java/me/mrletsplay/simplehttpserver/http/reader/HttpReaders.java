@@ -65,8 +65,8 @@ public class HttpReaders {
 	public static Reader<HttpHeaderFields> headerFieldsReader() {
 		Reader<HttpHeaderFields> reader = new ReaderImpl<>();
 
-		SimpleRef<List<String>> lines = SimpleRef.createRewritable();
-		SimpleRef<String> line = SimpleRef.createRewritable();
+		SimpleRef<List<String>> lines = SimpleRef.create();
+		SimpleRef<String> line = SimpleRef.create();
 		reader.run(instance -> lines.set(instance, new ArrayList<>()));
 		reader.loopUntil(instance -> line.get(instance).isEmpty(), readLine(line, MAX_REQUEST_LINE_LENGTH).thenRun(instance -> lines.get(instance).add(line.get(instance))));
 
