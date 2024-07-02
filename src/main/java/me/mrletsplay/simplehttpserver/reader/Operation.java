@@ -2,8 +2,8 @@ package me.mrletsplay.simplehttpserver.reader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.function.Consumer;
 
+import me.mrletsplay.simplehttpserver.util.UnsafeConsumer;
 import me.mrletsplay.simplehttpserver.util.UnsafeRunnable;
 
 public interface Operation extends OperationCallback {
@@ -34,7 +34,7 @@ public interface Operation extends OperationCallback {
 	 * @param other The action to run
 	 * @return An Operation
 	 */
-	public default Operation thenRun(Consumer<ReaderInstance<?>> other) {
+	public default Operation thenRun(UnsafeConsumer<ReaderInstance<?>> other) {
 		return then(Operations.stateless((instance, buf) -> {
 			other.accept(instance);
 			return true;

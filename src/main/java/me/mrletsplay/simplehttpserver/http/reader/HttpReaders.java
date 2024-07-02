@@ -1,8 +1,11 @@
 package me.mrletsplay.simplehttpserver.http.reader;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
 import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
@@ -22,7 +25,9 @@ public class HttpReaders {
 	public static final int
 		MAX_REQUEST_LINE_LENGTH = 65535;
 
-	public static Reader<HttpClientHeader> clientHeaderReader() {
+	public static final Reader<HttpClientHeader> CLIENT_HEADER_READER = clientHeaderReader();
+
+	private static Reader<HttpClientHeader> clientHeaderReader() {
 		Reader<HttpClientHeader> reader = new ReaderImpl<>();
 
 		Ref<String[]> requestLine = readLine(reader, MAX_REQUEST_LINE_LENGTH).map(l -> l.split(" "));
@@ -52,17 +57,22 @@ public class HttpReaders {
 			}
 		});
 
+		Ref<List<String>> transferEncoding = fields.map(f -> !f.has("Transfer-Encoding") ? null : Arrays.stream(f.getFirst("Transfer-Encoding").toLowerCase().split(",")).map(String::trim).collect(Collectors.toList()));
+		Ref<Boolean> isChunked = transferEncoding.map(e -> e != null && e.contains("chunked"));
+
+		reader.expect(instance -> !(contentLength.isSet(instance) && isChunked.get(instance))).orElseThrow(() -> new IOException("Headers contain both a content length and a transfer encoding field"));
+
 		SimpleRef<byte[]> postData = SimpleRef.create();
 		reader.branch(instance -> contentLength.isSet(instance), Operations.lazy(instance -> Operations.readNBytes(postData, contentLength.get(instance))), null);
 
-		// TODO: chunked
+		reader.branch(isChunked, readChunks(postData), null);
 
 		reader.setConverter(instance -> new HttpClientHeader(requestMethod.get(instance), path.get(instance), protocolVersion.get(instance), fields.get(instance), postData.getOrElse(instance, null)));
 
 		return reader;
 	}
 
-	public static Reader<HttpHeaderFields> headerFieldsReader() {
+	private static Reader<HttpHeaderFields> headerFieldsReader() {
 		Reader<HttpHeaderFields> reader = new ReaderImpl<>();
 
 		SimpleRef<List<String>> lines = SimpleRef.create();
@@ -99,6 +109,39 @@ public class HttpReaders {
 			byte[] bytes = line.get(instance);
 			ref.set(instance, new String(bytes, 0, bytes.length - 2));
 		});
+	}
+
+	private static Operation readChunks(SimpleRef<byte[]> ref) {
+		SimpleRef<Integer> chunkLength = SimpleRef.create();
+		SimpleRef<byte[]> chunkData = SimpleRef.create();
+		SimpleRef<ByteArrayOutputStream> bOut = SimpleRef.create();
+
+		return Operations.allOf(
+			Operations.run(instance -> bOut.set(instance, new ByteArrayOutputStream())),
+			Operations.loopUntil(chunkLength.map(l -> l == 0), readChunk(chunkLength, chunkData)
+				.thenRun(instance -> bOut.get(instance).write(chunkData.get(instance)))),
+			Operations.run(instance -> ref.set(instance, bOut.get(instance).toByteArray()))
+		);
+	}
+
+	private static Operation readChunk(SimpleRef<Integer> chunkLength, SimpleRef<byte[]> chunkData) {
+		SimpleRef<String> length = SimpleRef.create();
+		SimpleRef<byte[]> suffix = SimpleRef.create();
+		return Operations.allOf(
+			readLine(length, 10),
+			Operations.run(instance -> {
+				try {
+					chunkLength.set(instance, Integer.parseInt(length.get(instance), 16));
+				} catch(NumberFormatException e) {
+					throw new IOException("Invalid chunk length");
+				}
+			}),
+			Operations.lazy(instance -> Operations.readNBytes(chunkData, chunkLength.get(instance))),
+			Operations.readNBytes(suffix, 2),
+			Operations.run(instance -> {
+				if(!Arrays.equals(suffix.get(instance), END_OF_LINE)) throw new IOException("Illegal end of chunk");
+			})
+		);
 	}
 
 }

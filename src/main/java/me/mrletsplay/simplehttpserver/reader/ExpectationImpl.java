@@ -20,7 +20,8 @@ public class ExpectationImpl implements Expectation {
 	}
 
 	public void fail() throws IOException {
-		if(run != null) run.run();
+		if(run == null) throw new IOException("Expectation failed");
+		run.run();
 	}
 
 }
