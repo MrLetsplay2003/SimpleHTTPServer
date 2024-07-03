@@ -1,6 +1,6 @@
 package me.mrletsplay.simplehttpserver.http.server.connection;
 
-import java.net.Socket;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,7 +19,7 @@ public class HttpConnectionAcceptor implements ConnectionAcceptor {
 	}
 
 	@Override
-	public HttpConnection createConnection(Socket socket) {
+	public HttpConnection createConnection(SocketChannel socket) {
 		return new HttpConnection(server, socket);
 	}
 
@@ -27,7 +27,6 @@ public class HttpConnectionAcceptor implements ConnectionAcceptor {
 	public void accept(Connection connection) {
 		HttpConnection con = (HttpConnection) connection;
 		connections.add(con);
-		con.startRecieving();
 	}
 
 	@Override

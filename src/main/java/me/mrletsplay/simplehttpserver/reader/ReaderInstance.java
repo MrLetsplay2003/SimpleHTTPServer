@@ -16,4 +16,6 @@ public interface ReaderInstance<T> {
 
 	public <R> R getRef(Ref<R> ref) throws IllegalStateException;
 
+	public void reset();
+
 }

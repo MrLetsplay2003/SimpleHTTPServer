@@ -2,10 +2,13 @@ package me.mrletsplay.simplehttpserver.server.impl;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -20,7 +23,8 @@ import me.mrletsplay.simplehttpserver.server.connection.ConnectionAcceptor;
 public abstract class AbstractServer implements Server {
 
 	private AbstractServerConfiguration configuration;
-	private ServerSocket socket;
+	private ServerSocketChannel socket;
+	private Selector selector;
 	private ConnectionAcceptor acceptor;
 	private ExecutorService executor;
 
@@ -28,21 +32,25 @@ public abstract class AbstractServer implements Server {
 		this.configuration = configuration;
 	}
 
-	protected ServerSocket createSocket() throws UnknownHostException, IOException {
-		return new ServerSocket(configuration.getPort(), 50, InetAddress.getByName(configuration.getHost()));
+	protected ServerSocketChannel createSocket() throws UnknownHostException, IOException {
+		ServerSocketChannel socket = ServerSocketChannel.open();
+		socket.bind(new InetSocketAddress(InetAddress.getByName(configuration.getHost()), configuration.getPort()));
+		socket.configureBlocking(false);
+		return socket;
 	}
 
 	@Override
 	public void start() {
 		try {
 			socket = createSocket();
-			socket.setSoTimeout(1000);
+			selector = Selector.open();
+			socket.register(selector, SelectionKey.OP_ACCEPT);
+
 			executor = Executors.newCachedThreadPool();
 			executor.execute(() -> {
 				while(!executor.isShutdown()) {
 					try {
-						acceptConnection();
-					}catch(SocketTimeoutException ignored) {
+						workLoop();
 					}catch(Exception e) {
 						getLogger().error("Error while accepting connection", e);
 					}
@@ -53,16 +61,62 @@ public abstract class AbstractServer implements Server {
 		}
 	}
 
-	private void acceptConnection() throws IOException {
-		Socket s = socket.accept();
+	private void workLoop() throws IOException {
+		selector.select(1000);
 		if(executor.isShutdown()) return;
-		Connection con = acceptor.createConnection(s);
+
+		Set<SelectionKey> selected = selector.selectedKeys();
+		var iterator = selected.iterator();
+		while(iterator.hasNext()) {
+			SelectionKey key = iterator.next();
+
+			if(key.isValid() && key.isAcceptable()) {
+				Connection con = acceptConnection();
+				con.getSocket().register(selector, SelectionKey.OP_READ, con);
+			}
+
+			if(key.attachment() instanceof Connection) {
+				Connection con = (Connection) key.attachment();
+				if(!con.isSocketAlive()) {
+					con.close();
+					continue;
+				}
+
+				if(key.isValid() && key.isReadable()) {
+					try {
+						con.readData();
+					}catch(IOException e) {
+						getLogger().error("Client read error", e);
+						con.close();
+					}
+				}
+
+				if(key.isValid() && key.isWritable()) {
+					try {
+						con.writeData();
+					}catch(IOException e) {
+						getLogger().error("Client write error", e);
+						con.close();
+					}
+				}
+			}
+
+			iterator.remove();
+		}
+	}
+
+	private Connection acceptConnection() throws IOException {
+		SocketChannel client = socket.accept();
+		client.configureBlocking(false);
+
+		Connection con = acceptor.createConnection(client);
 		acceptor.accept(con);
+		return con;
 	}
 
 	@Override
 	public boolean isRunning() {
-		return socket != null && !socket.isClosed();
+		return socket != null && socket.isOpen();
 	}
 
 	@Override
@@ -114,6 +168,11 @@ public abstract class AbstractServer implements Server {
 	@Override
 	public ExecutorService getExecutor() {
 		return executor;
+	}
+
+	@Override
+	public Selector getSelector() {
+		return selector;
 	}
 
 	@Override

@@ -1,18 +1,23 @@
 package me.mrletsplay.simplehttpserver.server.connection;
 
 import java.io.IOException;
-import java.net.Socket;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
 
 import me.mrletsplay.simplehttpserver.server.Server;
 import me.mrletsplay.simplehttpserver.server.ServerException;
 
 public interface Connection {
 
-	public void startRecieving();
+	public void readData() throws IOException;
+
+	public void writeData() throws IOException;
 
 	public Server getServer();
 
-	public Socket getSocket();
+	public SocketChannel getSocket();
+
+	public SelectionKey getSelectionKey();
 
 	public void setDead();
 
@@ -20,6 +25,7 @@ public interface Connection {
 
 	public default void close() {
 		try {
+			getSelectionKey().cancel();
 			getSocket().close();
 			getServer().getConnectionAcceptor().remove(this);
 		} catch (IOException e) {
@@ -28,7 +34,7 @@ public interface Connection {
 	}
 
 	public default boolean isSocketAlive() {
-		return !isDead() && !getSocket().isClosed() && getSocket().isConnected() && getSocket().isBound() && !getSocket().isInputShutdown() && !getSocket().isOutputShutdown();
+		return !isDead() && getSocket().isConnected() || getSocket().isConnectionPending();
 	}
 
 }

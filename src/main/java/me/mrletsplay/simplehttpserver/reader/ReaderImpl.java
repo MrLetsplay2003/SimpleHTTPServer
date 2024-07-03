@@ -195,9 +195,7 @@ public class ReaderImpl<T> implements Reader<T> {
 		private Consumer<T> onFinished;
 
 		public Instance() {
-			this.operations = ReaderImpl.this.operations.stream().map(Operation::copy).collect(Collectors.toList());
-			this.idx = 0;
-			this.refValues = new HashMap<>();
+			reset();
 		}
 
 		@Override
@@ -247,6 +245,15 @@ public class ReaderImpl<T> implements Reader<T> {
 		public <R> R getRef(Ref<R> ref) throws IllegalStateException {
 			if(!refValues.containsKey(ref)) throw new IllegalStateException("Tried to access ref before it was set (make sure you only call get() in a callback)");
 			return (R) refValues.get(ref);
+		}
+
+		@Override
+		public void reset() {
+			this.operations = ReaderImpl.this.operations.stream().map(Operation::copy).collect(Collectors.toList());
+			this.idx = 0;
+			this.refValues = new HashMap<>();
+			this.finished = false;
+			this.value = null;
 		}
 
 	}
