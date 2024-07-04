@@ -46,7 +46,7 @@ public abstract class AbstractServer implements Server {
 			selector = Selector.open();
 			socket.register(selector, SelectionKey.OP_ACCEPT);
 
-			executor = Executors.newCachedThreadPool();
+			executor = Executors.newFixedThreadPool(10);
 			executor.execute(() -> {
 				while(!executor.isShutdown()) {
 					try {

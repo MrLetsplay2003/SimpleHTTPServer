@@ -42,9 +42,7 @@ public class HttpConnection extends AbstractConnection {
 
 	private WebSocketConnection websocketConnection;
 
-	private LinkedBlockingQueue<HttpClientHeader> requestQueue;
-
-	private LinkedBlockingQueue<HttpServerHeader> responseQueue;
+	private LinkedBlockingQueue<RequestAndResponse> responseQueue;
 
 	private ReaderInstance<HttpClientHeader> readerInstance;
 
@@ -52,14 +50,14 @@ public class HttpConnection extends AbstractConnection {
 
 	public HttpConnection(HttpServer server, SocketChannel socket) {
 		super(server, socket);
-		this.requestQueue = new LinkedBlockingQueue<>();
 		this.responseQueue = new LinkedBlockingQueue<>();
 		this.readerInstance = HttpReaders.CLIENT_HEADER_READER.createInstance();
-		readerInstance.onFinished(h -> {
-			System.out.println(h.getMethod() + " " + h.getPath() + " " + h.getProtocolVersion());
+		readerInstance.onFinished(request -> {
+//			System.out.println(request.getMethod() + " " + request.getPath() + " " + request.getProtocolVersion());
 			readerInstance.reset();
-			requestQueue.offer(h);
-			responseQueue.offer(createResponse(h));
+			RequestAndResponse requestAndResponse = new RequestAndResponse(request);
+			server.getExecutor().submit(() -> processRequest(requestAndResponse));
+			responseQueue.offer(requestAndResponse);
 		});
 	}
 
@@ -87,11 +85,14 @@ public class HttpConnection extends AbstractConnection {
 
 	@Override
 	public void writeData(ByteBuffer buffer) throws IOException {
-		if(currentResponse == null && responseQueue.isEmpty()) return;
+		if(currentResponse == null && responseQueue.isEmpty()) return; // TODO: improve, change interestOps
 
 		if(currentResponse == null) {
-			HttpServerHeader response = responseQueue.poll();
-			ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+			if(responseQueue.peek().response == null) return; // TODO: improve, change interestOps
+
+			RequestAndResponse requestAndResponse = responseQueue.poll();
+			HttpServerHeader response = requestAndResponse.response;
+			ByteArrayOutputStream bOut = new ByteArrayOutputStream(); // TODO: improve
 			bOut.write(response.getHeaderBytes());
 			bOut.write(response.getContent().readAllBytes());
 			currentResponse = Channels.newChannel(new ByteArrayInputStream(bOut.toByteArray()));
@@ -157,12 +158,14 @@ public class HttpConnection extends AbstractConnection {
 		}
 	}
 
-	private HttpServerHeader createResponse(HttpClientHeader h) {
+	private void processRequest(RequestAndResponse requestAndResponse) {
+		HttpClientHeader request = requestAndResponse.request;
+
 		HttpServerHeader sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
-		HttpRequestContext ctx = new HttpRequestContext(this, h, sh);
+		HttpRequestContext ctx = new HttpRequestContext(this, request, sh);
 		HttpRequestContext.setCurrentContext(ctx);
 
-		HttpDocument d = getServer().getDocumentProvider().get(h.getMethod(), h.getPath().getDocumentPath());
+		HttpDocument d = getServer().getDocumentProvider().get(request.getMethod(), request.getPath().getDocumentPath());
 		if(d == null) d = getServer().getDocumentProvider().getNotFoundDocument();
 
 		try {
@@ -190,14 +193,14 @@ public class HttpConnection extends AbstractConnection {
 
 			// Reset all of the context-related fields to ensure a clean environment
 			sh = new HttpServerHeader(getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
-			ctx = new HttpRequestContext(this, h, sh);
+			ctx = new HttpRequestContext(this, request, sh);
 			HttpRequestContext.setCurrentContext(ctx);
 			ctx.setException(e);
 
 			getServer().getDocumentProvider().getErrorDocument().createContent();
 		}
 
-		return sh;
+		requestAndResponse.response = sh;
 	}
 
 	private HttpServerHeader createResponseFromException(HttpResponseException exception) {
@@ -338,6 +341,17 @@ public class HttpConnection extends AbstractConnection {
 	public void close() {
 		if(websocketConnection != null && isSocketAlive()) websocketConnection.sendCloseFrame(CloseFrame.GOING_AWAY, "Server shutting down");
 		super.close();
+	}
+
+	private class RequestAndResponse {
+
+		private HttpClientHeader request;
+		private HttpServerHeader response;
+
+		public RequestAndResponse(HttpClientHeader request) {
+			this.request = request;
+		}
+
 	}
 
 }
