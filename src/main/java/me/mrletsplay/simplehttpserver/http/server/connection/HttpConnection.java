@@ -1,14 +1,19 @@
 package me.mrletsplay.simplehttpserver.http.server.connection;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -35,24 +40,26 @@ import me.mrletsplay.simplehttpserver.server.connection.AbstractConnection;
 
 public class HttpConnection extends AbstractConnection {
 
-	public static final int BUFFER_SIZE = 4096;
-
 	private WebSocketConnection websocketConnection;
 
-	private ByteBuffer
-		readBuffer,
-		writeBuffer;
+	private LinkedBlockingQueue<HttpClientHeader> requestQueue;
+
+	private LinkedBlockingQueue<HttpServerHeader> responseQueue;
 
 	private ReaderInstance<HttpClientHeader> readerInstance;
 
+	private ReadableByteChannel currentResponse;
+
 	public HttpConnection(HttpServer server, SocketChannel socket) {
 		super(server, socket);
-		this.readBuffer = ByteBuffer.allocate(BUFFER_SIZE);
-		this.writeBuffer = ByteBuffer.allocate(BUFFER_SIZE);
+		this.requestQueue = new LinkedBlockingQueue<>();
+		this.responseQueue = new LinkedBlockingQueue<>();
 		this.readerInstance = HttpReaders.CLIENT_HEADER_READER.createInstance();
 		readerInstance.onFinished(h -> {
 			System.out.println(h.getMethod() + " " + h.getPath() + " " + h.getProtocolVersion());
 			readerInstance.reset();
+			requestQueue.offer(h);
+			responseQueue.offer(createResponse(h));
 		});
 	}
 
@@ -74,17 +81,33 @@ public class HttpConnection extends AbstractConnection {
 	}
 
 	@Override
-	public void readData() throws IOException {
-		if(readBuffer.remaining() == 0) throw new IOException("Read buffer overflow");
-		if(getSocket().read(readBuffer) == -1) {
-			close();
-			return;
+	public void readData(ByteBuffer buffer) throws IOException {
+		readerInstance.read(buffer);
+	}
+
+	@Override
+	public void writeData(ByteBuffer buffer) throws IOException {
+		if(currentResponse == null && responseQueue.isEmpty()) return;
+
+		if(currentResponse == null) {
+			HttpServerHeader response = responseQueue.poll();
+			ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+			bOut.write(response.getHeaderBytes());
+			bOut.write(response.getContent().readAllBytes());
+			currentResponse = Channels.newChannel(new ByteArrayInputStream(bOut.toByteArray()));
 		}
 
-		readBuffer.flip();
-		readerInstance.read(readBuffer);
-		readBuffer.compact();
+		if(currentResponse.read(buffer) == -1) {
+			currentResponse = null;
+		}
+	}
 
+	public void workLoop() {
+
+	}
+
+//	@Override
+//	public void readData() throws IOException {
 //		if(websocketConnection != null) {
 //			websocketConnection.receive();
 //			return true;
@@ -123,12 +146,7 @@ public class HttpConnection extends AbstractConnection {
 //		HttpRequestContext.setCurrentContext(null);
 //
 //		return keepAlive || websocketConnection != null;
-	}
-
-	@Override
-	public void writeData() throws IOException {
-
-	}
+//	}
 
 	private boolean process(HttpRequestContext context, RequestProcessor process) {
 		try {

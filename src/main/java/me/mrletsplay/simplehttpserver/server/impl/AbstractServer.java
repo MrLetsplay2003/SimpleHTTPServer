@@ -72,7 +72,7 @@ public abstract class AbstractServer implements Server {
 
 			if(key.isValid() && key.isAcceptable()) {
 				Connection con = acceptConnection();
-				con.getSocket().register(selector, SelectionKey.OP_READ, con);
+				con.getSocket().register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, con);
 			}
 
 			if(key.attachment() instanceof Connection) {
