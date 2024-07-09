@@ -18,14 +18,14 @@ import org.slf4j.Logger;
 import me.mrletsplay.simplehttpserver.server.Server;
 import me.mrletsplay.simplehttpserver.server.ServerException;
 import me.mrletsplay.simplehttpserver.server.connection.Connection;
-import me.mrletsplay.simplehttpserver.server.connection.ConnectionAcceptor;
+import me.mrletsplay.simplehttpserver.server.connection.ConnectionManager;
 
 public abstract class AbstractServer implements Server {
 
 	private AbstractServerConfiguration configuration;
 	private ServerSocketChannel socket;
 	private Selector selector;
-	private ConnectionAcceptor acceptor;
+	private ConnectionManager manager;
 	private ExecutorService executor;
 
 	public AbstractServer(AbstractServerConfiguration configuration) {
@@ -38,6 +38,8 @@ public abstract class AbstractServer implements Server {
 		socket.configureBlocking(false);
 		return socket;
 	}
+
+	protected abstract Connection createConnection(SocketChannel socket);
 
 	@Override
 	public void start() {
@@ -109,8 +111,8 @@ public abstract class AbstractServer implements Server {
 		SocketChannel client = socket.accept();
 		client.configureBlocking(false);
 
-		Connection con = acceptor.createConnection(client);
-		acceptor.accept(con);
+		Connection con = createConnection(client);
+		manager.accept(con);
 		return con;
 	}
 
@@ -120,14 +122,14 @@ public abstract class AbstractServer implements Server {
 	}
 
 	@Override
-	public void setConnectionAcceptor(ConnectionAcceptor acceptor) throws IllegalStateException {
+	public void setConnectionManager(ConnectionManager acceptor) throws IllegalStateException {
 		if(isRunning()) throw new IllegalStateException("Server is running");
-		this.acceptor = acceptor;
+		this.manager = acceptor;
 	}
 
 	@Override
-	public ConnectionAcceptor getConnectionAcceptor() {
-		return acceptor;
+	public ConnectionManager getConnectionManager() {
+		return manager;
 	}
 
 	/**
@@ -179,7 +181,7 @@ public abstract class AbstractServer implements Server {
 	public void shutdown() {
 		try {
 			executor.shutdown();
-			acceptor.closeAllConnections();
+			manager.closeAllConnections();
 			try {
 				if(!executor.awaitTermination(5L, TimeUnit.SECONDS)) executor.shutdownNow();
 			}catch(InterruptedException e) {

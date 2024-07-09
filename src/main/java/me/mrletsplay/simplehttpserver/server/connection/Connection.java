@@ -27,7 +27,7 @@ public interface Connection {
 		try {
 			getSelectionKey().cancel();
 			getSocket().close();
-			getServer().getConnectionAcceptor().remove(this);
+			getServer().getConnectionManager().remove(this);
 		} catch (IOException e) {
 			throw new ServerException("Error while closing the connection", e);
 		}

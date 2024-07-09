@@ -11,27 +11,27 @@ import me.mrletsplay.simplehttpserver.http.header.HttpServerHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpUrlPath;
 import me.mrletsplay.simplehttpserver.http.response.HttpResponse;
 import me.mrletsplay.simplehttpserver.http.server.HttpServer;
-import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnectionImpl;
 
 public class HttpRequestContext {
 
 	private static ThreadLocal<HttpRequestContext> context = new ThreadLocal<>();
 
-	private HttpConnection connection;
+	private HttpConnectionImpl connection;
 	private HttpClientHeader clientHeader;
 	private HttpServerHeader serverHeader;
 	private Map<String, String> pathParameters;
 	private Map<String, Object> properties;
 	private Exception exception;
 
-	public HttpRequestContext(HttpConnection connection, HttpClientHeader clientHeader, HttpServerHeader serverHeader) {
+	public HttpRequestContext(HttpConnectionImpl connection, HttpClientHeader clientHeader, HttpServerHeader serverHeader) {
 		this.connection = connection;
 		this.clientHeader = clientHeader;
 		this.serverHeader = serverHeader;
 		this.properties = new HashMap<>();
 	}
 
-	public HttpConnection getConnection() {
+	public HttpConnectionImpl getConnection() {
 		return connection;
 	}
 

@@ -5,7 +5,7 @@ import java.util.concurrent.ExecutorService;
 
 import org.slf4j.Logger;
 
-import me.mrletsplay.simplehttpserver.server.connection.ConnectionAcceptor;
+import me.mrletsplay.simplehttpserver.server.connection.ConnectionManager;
 
 public interface Server {
 
@@ -13,9 +13,9 @@ public interface Server {
 
 	public boolean isRunning();
 
-	public void setConnectionAcceptor(ConnectionAcceptor acceptor) throws IllegalStateException;
+	public void setConnectionManager(ConnectionManager manager) throws IllegalStateException;
 
-	public ConnectionAcceptor getConnectionAcceptor();
+	public ConnectionManager getConnectionManager();
 
 	public String getHost();
 

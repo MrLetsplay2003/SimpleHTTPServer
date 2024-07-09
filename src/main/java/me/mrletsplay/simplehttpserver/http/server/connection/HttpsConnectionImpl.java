@@ -21,7 +21,7 @@ import me.mrletsplay.simplehttpserver.http.server.HttpServer;
 import me.mrletsplay.simplehttpserver.server.connection.AbstractConnection;
 import me.mrletsplay.simplehttpserver.util.BufferUtil;
 
-public class HttpsConnection extends AbstractConnection implements IHttpConnection {
+public class HttpsConnectionImpl extends AbstractConnection implements HttpConnection {
 
 	private SSLEngine engine;
 
@@ -33,7 +33,7 @@ public class HttpsConnection extends AbstractConnection implements IHttpConnecti
 		peerAppData, // Write
 		peerNetData; // Write
 
-	public HttpsConnection(HttpServer server, SocketChannel socket, SSLContext sslContext) {
+	public HttpsConnectionImpl(HttpServer server, SocketChannel socket, SSLContext sslContext) {
 		super(server, socket);
 
 		handshakeDone = false;

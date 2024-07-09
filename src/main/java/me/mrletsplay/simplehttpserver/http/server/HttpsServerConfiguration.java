@@ -15,8 +15,8 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 
 	private String certificatePassword;
 
-	protected HttpsServerConfiguration(String host, int port, Logger logger, boolean debugMode, CorsConfiguration defaultCorsConfiguration, long readTimeout, File certificateFile, File certificateKeyFile, String certificatePassword) {
-		super(host, port, logger, debugMode, defaultCorsConfiguration, readTimeout);
+	protected HttpsServerConfiguration(String host, int port, Logger logger, int poolSize, boolean debugMode, CorsConfiguration defaultCorsConfiguration, long readTimeout, File certificateFile, File certificateKeyFile, String certificatePassword) {
+		super(host, port, logger, poolSize, debugMode, defaultCorsConfiguration, readTimeout);
 		this.certificateFile = certificateFile;
 		this.certificateKeyFile = certificateKeyFile;
 		this.certificatePassword = certificatePassword;
@@ -63,6 +63,11 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 		}
 
 		@Override
+		public Builder poolSize(int poolSize) {
+			return (Builder) super.poolSize(poolSize);
+		}
+
+		@Override
 		public Builder debugMode(boolean debugMode) {
 			return (Builder) super.debugMode(debugMode);
 		}
@@ -103,7 +108,7 @@ public class HttpsServerConfiguration extends HttpServerConfiguration {
 		@Override
 		public HttpsServerConfiguration create() throws IllegalStateException {
 			verify();
-			return new HttpsServerConfiguration(host, port, logger, debugMode, defaultCorsConfiguration, readTimeout, certificateFile, certificateKeyFile, certificatePassword);
+			return new HttpsServerConfiguration(host, port, logger, poolSize, debugMode, defaultCorsConfiguration, readTimeout, certificateFile, certificateKeyFile, certificatePassword);
 		}
 
 	}
