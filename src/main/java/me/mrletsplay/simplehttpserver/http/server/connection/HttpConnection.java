@@ -36,9 +36,9 @@ import me.mrletsplay.simplehttpserver.http.util.MimeType;
 import me.mrletsplay.simplehttpserver.http.websocket.WebSocketConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
 import me.mrletsplay.simplehttpserver.reader.ReaderInstance;
-import me.mrletsplay.simplehttpserver.server.connection.AbstractConnection;
+import me.mrletsplay.simplehttpserver.server.connection.AbstractBufferedConnection;
 
-public class HttpConnection extends AbstractConnection {
+public class HttpConnection extends AbstractBufferedConnection {
 
 	private WebSocketConnection websocketConnection;
 
