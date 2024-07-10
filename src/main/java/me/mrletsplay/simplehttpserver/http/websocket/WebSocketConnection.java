@@ -3,7 +3,7 @@ package me.mrletsplay.simplehttpserver.http.websocket;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnectionImpl;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.BinaryFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.TextFrame;
@@ -11,7 +11,7 @@ import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketFrame;
 
 public class WebSocketConnection {
 
-	private HttpConnectionImpl httpConnection;
+	private HttpConnection httpConnection;
 	private WebSocketEndpoint endpoint;
 
 	private boolean hasSentCloseFrame;
@@ -21,12 +21,12 @@ public class WebSocketConnection {
 
 	private Object attachment;
 
-	public WebSocketConnection(HttpConnectionImpl httpConnection, WebSocketEndpoint endpoint) {
+	public WebSocketConnection(HttpConnection httpConnection, WebSocketEndpoint endpoint) {
 		this.httpConnection = httpConnection;
 		this.endpoint = endpoint;
 	}
 
-	public HttpConnectionImpl getHttpConnection() {
+	public HttpConnection getHttpConnection() {
 		return httpConnection;
 	}
 

@@ -23,6 +23,24 @@ public interface Connection {
 
 	public boolean isDead();
 
+	public default void startReading() {
+		getSelectionKey().interestOpsOr(SelectionKey.OP_READ);
+		getServer().getSelector().wakeup();
+	}
+
+	public default void stopReading() {
+		getSelectionKey().interestOpsAnd(~SelectionKey.OP_READ);
+	}
+
+	public default void startWriting() {
+		getSelectionKey().interestOpsOr(SelectionKey.OP_WRITE);
+		getServer().getSelector().wakeup();
+	}
+
+	public default void stopWriting() {
+		getSelectionKey().interestOpsAnd(~SelectionKey.OP_WRITE);
+	}
+
 	public default void close() {
 		try {
 			getSelectionKey().cancel();

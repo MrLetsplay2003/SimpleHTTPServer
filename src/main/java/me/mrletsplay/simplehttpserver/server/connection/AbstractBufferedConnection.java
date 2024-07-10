@@ -44,6 +44,11 @@ public abstract class AbstractBufferedConnection extends AbstractConnection {
 			writeBuffer.clear();
 			writeData(writeBuffer);
 			writeBuffer.flip();
+
+			if(writeBuffer.remaining() == 0) {
+				stopWriting();
+				return;
+			}
 		}
 
 		if(getSocket().write(writeBuffer) == -1) {

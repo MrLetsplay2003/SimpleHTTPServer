@@ -1,10 +1,8 @@
 package me.mrletsplay.simplehttpserver.http.server.connection;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -18,8 +16,9 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
 
 import me.mrletsplay.simplehttpserver.http.server.HttpServer;
+import me.mrletsplay.simplehttpserver.http.websocket.WebSocketConnection;
 import me.mrletsplay.simplehttpserver.server.connection.AbstractConnection;
-import me.mrletsplay.simplehttpserver.util.BufferUtil;
+import me.mrletsplay.simplehttpserver.util.RWBuffer;
 
 public class HttpsConnectionImpl extends AbstractConnection implements HttpConnection {
 
@@ -27,11 +26,13 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 
 	private boolean handshakeDone;
 
-	private ByteBuffer
-		myAppData, // Read
-		myNetData, // Read
-		peerAppData, // Write
-		peerNetData; // Write
+	private RWBuffer
+		myAppData, // Read, outbound unencrypted data
+		myNetData, // Read, outbound encrypted data
+		peerAppData, // Write, inbound unencrypted data
+		peerNetData; // Write, inbound encrypted data
+
+	private HttpDataProcessor dataProcessor;
 
 	public HttpsConnectionImpl(HttpServer server, SocketChannel socket, SSLContext sslContext) {
 		super(server, socket);
@@ -42,12 +43,10 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 		engine.setUseClientMode(false);
 
 		SSLSession session = engine.getSession();
-		myAppData = ByteBuffer.allocate(session.getApplicationBufferSize());
-		myAppData.limit(0);
-		myNetData = ByteBuffer.allocate(session.getPacketBufferSize());
-		myNetData.limit(0);
-		peerAppData = ByteBuffer.allocate(session.getApplicationBufferSize());
-		peerNetData = ByteBuffer.allocate(session.getPacketBufferSize());
+		myAppData = RWBuffer.readableBuffer(session.getApplicationBufferSize());
+		myNetData = RWBuffer.readableBuffer(session.getPacketBufferSize());
+		peerAppData = RWBuffer.writableBuffer(session.getApplicationBufferSize());
+		peerNetData = RWBuffer.writableBuffer(session.getPacketBufferSize());
 
 		try {
 			engine.beginHandshake();
@@ -55,11 +54,28 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+
+		dataProcessor = new HttpDataProcessor(this);
 	}
 
 	@Override
 	public boolean isSecure() {
 		return true;
+	}
+
+	@Override
+	public HttpServer getServer() {
+		return (HttpServer) super.getServer();
+	}
+
+	@Override
+	public void setWebsocketConnection(WebSocketConnection connection) {
+		dataProcessor.setWebsocketConnection(connection);
+	}
+
+	@Override
+	public WebSocketConnection getWebsocketConnection() {
+		return dataProcessor.getWebsocketConnection();
 	}
 
 	private void processAppData() throws IOException {
@@ -71,18 +87,20 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 
 		System.out.printf("Process read: %s, write: %s\n", read, write);
 
+		unwrapPeerData();
 		peerAppData.flip();
 		System.out.println("Read: " + read + ", " + peerAppData.remaining());
 		if(read && peerAppData.hasRemaining()) {
-//			readData(peerAppData); TODO
+			dataProcessor.readData(peerAppData.read());
 		}
-		peerAppData.compact();
+		peerAppData.flip();
 
-		myAppData.compact();
+		myAppData.flip();
 		if(write && myAppData.hasRemaining()) {
-//			writeData(myAppData); TODO
+			dataProcessor.writeData(myAppData.write());
 		}
 		myAppData.flip();
+		wrapMyData();
 		System.out.println("AFTER WRITE: " + myAppData.remaining());
 	}
 
@@ -93,32 +111,29 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 		if(!handshakeDone) {
 			performHandshake(true, false);
 			setHandshakeInterestOps();
-			return;
+			System.out.println(handshakeDone);
+			if(!handshakeDone) return;
 		}
 
 		if(peerNetData.remaining() == 0) throw new IOException("Buffer is full");
-		if(getSocket().read(peerNetData) == -1) {
+		if(getSocket().read(peerNetData.write()) == -1) {
 			close();
 			return;
 		}
 
-		unwrapPeerData();
 		processAppData();
 	}
 
 	protected void unwrapPeerData() throws IOException {
 		peerNetData.flip();
-		while(peerNetData.hasRemaining()) {
-			System.out.println(peerNetData.remaining());
-			SSLEngineResult res = engine.unwrap(peerNetData, peerAppData);
-			if(res.getStatus() != Status.OK) {
-				System.out.println(res.getStatus());
-				handleHandshakeStatus(res.getStatus());
-				break;
-			}
+		SSLEngineResult res = engine.unwrap(peerNetData.read(), peerAppData.write());
+		peerNetData.flip();
+
+		if(res.getStatus() != Status.OK) {
+			handleHandshakeStatus(res.getStatus());
 		}
-		peerNetData.compact();
-		System.out.println("read: " + new String(peerAppData.array(), 0, peerAppData.position()));
+
+		System.out.println("read: " + peerAppData);
 	}
 
 	@Override
@@ -128,36 +143,40 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 		if(!handshakeDone) {
 			performHandshake(false, true);
 			setHandshakeInterestOps();
-			return;
+			if(!handshakeDone) return;
 		}
 
 		processAppData();
-		wrapMyData();
 
 		System.out.println("W: " + myNetData.remaining());
-		if(getSocket().write(myNetData) == -1) {
+		if(getSocket().write(myNetData.read()) == -1) {
 			close();
 			return;
 		}
-		myNetData.compact();
 
 		if(!myNetData.hasRemaining()) {
-//			finishWrite(); TODO
+			stopWriting();
 		}
 	}
 
 	protected void wrapMyData() throws IOException {
-		myNetData.compact();
-		while(myAppData.hasRemaining()) {
-			System.out.println("FILLING: " + myAppData.remaining());
-			System.out.println(new String(myAppData.array(), myAppData.position(), myAppData.remaining(), StandardCharsets.UTF_8));
-			SSLEngineResult res = engine.wrap(myAppData, myNetData);
-			if(res.getStatus() != Status.OK) {
-				handleHandshakeStatus(res.getStatus());
-				break;
-			}
-		}
 		myNetData.flip();
+		if(!myNetData.hasRemaining()) {
+			myNetData.flip();
+			return;
+		}
+
+		System.out.println("FILLING: " + myAppData.remaining() + " -> " + myNetData.remaining());
+		System.out.println(myAppData);
+		SSLEngineResult res = engine.wrap(myAppData.read(), myNetData.write());
+		myNetData.flip();
+		System.out.println("Remaining after fill: " + myNetData.remaining());
+
+		if(res.getStatus() != Status.OK) {
+			System.out.println("NOT OK: " + res.getStatus());
+			handleHandshakeStatus(res.getStatus());
+			return;
+		}
 	}
 
 	protected void setHandshakeInterestOps() {
@@ -187,12 +206,12 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 
 	protected void performHandshake(boolean canRead, boolean canWrite) throws IOException {
 		if (canWrite && myNetData.hasRemaining()) {
-			if(getSocket().write(myNetData) == -1) {
+			if(getSocket().write(myNetData.read()) == -1) {
 				close();
 				return;
 			}
-			myNetData.compact();
-			myNetData.flip();
+//			myNetData.compact();
+//			myNetData.flip();
 
 			if(!myNetData.hasRemaining() && engine.getHandshakeStatus() == HandshakeStatus.NOT_HANDSHAKING) {
 				finishHandshake();
@@ -201,7 +220,7 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 			return;
 		}
 
-		if (canRead && getSocket().read(peerNetData) == -1) {
+		if (canRead && getSocket().read(peerNetData.write()) == -1) {
 			close();
 			return;
 		}
@@ -212,8 +231,8 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 				case NEED_UNWRAP:
 				{
 					peerNetData.flip();
-					SSLEngineResult res = engine.unwrap(peerNetData, peerAppData);
-					peerNetData.compact();
+					SSLEngineResult res = engine.unwrap(peerNetData.read(), peerAppData.write());
+					peerNetData.flip();
 
 					if (res.getStatus() != Status.OK) {
 						System.out.println("E: " + res.getStatus());
@@ -225,8 +244,8 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 				}
 				case NEED_WRAP:
 				{
-					myNetData.compact();
-					SSLEngineResult res = engine.wrap(myAppData, myNetData);
+					myNetData.flip();
+					SSLEngineResult res = engine.wrap(myAppData.read(), myNetData.write());
 					myNetData.flip();
 
 					if (res.getStatus() != Status.OK) {
@@ -272,14 +291,14 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 			case BUFFER_OVERFLOW:
 			{
 				if (engine.getSession().getApplicationBufferSize() > peerAppData.capacity()) {
-					peerAppData = BufferUtil.reallocate(peerAppData, engine.getSession().getApplicationBufferSize());
+					peerAppData.reallocate(engine.getSession().getApplicationBufferSize());
 				}
 
 				break;
 			}
 			case BUFFER_UNDERFLOW:
 				if (engine.getSession().getPacketBufferSize() > peerNetData.capacity()) {
-					peerNetData = BufferUtil.reallocate(peerNetData, engine.getSession().getPacketBufferSize());
+					peerNetData.reallocate(engine.getSession().getPacketBufferSize());
 				}
 
 				break;
