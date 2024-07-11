@@ -254,7 +254,7 @@ public class Operations {
 
 		@Override
 		public Operation copy() {
-			return new BranchOperation(value, branches);
+			return new BranchOperation(value, Arrays.stream(branches).map(op -> op == null ? null : op.copy()).toArray(Operation[]::new));
 		}
 
 	}

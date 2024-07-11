@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
+import org.slf4j.Logger;
+
 import me.mrletsplay.simplehttpserver.server.Server;
 import me.mrletsplay.simplehttpserver.server.ServerException;
 
@@ -22,6 +24,10 @@ public interface Connection {
 	public void setDead();
 
 	public boolean isDead();
+
+	public default Logger getLogger() {
+		return getServer().getLogger();
+	}
 
 	public default void startReading() {
 		getSelectionKey().interestOpsOr(SelectionKey.OP_READ);

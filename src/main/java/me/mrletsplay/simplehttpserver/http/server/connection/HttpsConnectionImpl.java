@@ -85,12 +85,12 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 		boolean read = (ops & SelectionKey.OP_READ) == SelectionKey.OP_READ;
 		boolean write = (ops & SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE;
 
-		System.out.printf("Process read: %s, write: %s\n", read, write);
+		getLogger().trace(String.format("Processing app data (read: %s, write: %s)", read, write));
 
 		unwrapPeerData();
 		peerAppData.flip();
-		System.out.println("Read: " + read + ", " + peerAppData.remaining());
 		if(read && peerAppData.hasRemaining()) {
+			getLogger().trace("Bytes to read: " + peerAppData.remaining());
 			dataProcessor.readData(peerAppData.read());
 		}
 		peerAppData.flip();
@@ -101,17 +101,15 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 		}
 		myAppData.flip();
 		wrapMyData();
-		System.out.println("AFTER WRITE: " + myAppData.remaining());
 	}
 
 	@Override
 	public void readData() throws IOException {
-		System.out.println("--- R: " + engine.getHandshakeStatus());
+		getLogger().trace("Reading data from socket. Status: " + engine.getHandshakeStatus());
 
 		if(!handshakeDone) {
 			performHandshake(true, false);
 			setHandshakeInterestOps();
-			System.out.println(handshakeDone);
 			if(!handshakeDone) return;
 		}
 
@@ -133,12 +131,12 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 			handleHandshakeStatus(res.getStatus());
 		}
 
-		System.out.println("read: " + peerAppData);
+		getLogger().trace(String.format("Unwrapped app data:\n\n%s\n\n", peerAppData));
 	}
 
 	@Override
 	public void writeData() throws IOException {
-		System.out.println("--- W: " + engine.getHandshakeStatus());
+		getLogger().trace(String.format("Writing data to socket. Status: " + engine.getHandshakeStatus()));
 
 		if(!handshakeDone) {
 			performHandshake(false, true);
@@ -148,7 +146,7 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 
 		processAppData();
 
-		System.out.println("W: " + myNetData.remaining());
+		getLogger().trace(String.format("Can write up to %s bytes", myNetData.remaining()));
 		if(getSocket().write(myNetData.read()) == -1) {
 			close();
 			return;
@@ -166,14 +164,14 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 			return;
 		}
 
-		System.out.println("FILLING: " + myAppData.remaining() + " -> " + myNetData.remaining());
-		System.out.println(myAppData);
+		getLogger().trace(String.format("Wrapping app data (%s bytes, buffer size remaining: %s)", myAppData.remaining(), myNetData.remaining()));
+		getLogger().trace(String.format("Data to wrap:\n\n%s\n\n", myAppData));
 		SSLEngineResult res = engine.wrap(myAppData.read(), myNetData.write());
 		myNetData.flip();
-		System.out.println("Remaining after fill: " + myNetData.remaining());
+		getLogger().trace(String.format("Buffer size remaining after wrapping: %s", myNetData.remaining()));
 
 		if(res.getStatus() != Status.OK) {
-			System.out.println("NOT OK: " + res.getStatus());
+			getLogger().debug(String.format("Got non-OK status after wrapping: %s", res.getStatus()));
 			handleHandshakeStatus(res.getStatus());
 			return;
 		}
@@ -210,8 +208,6 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 				close();
 				return;
 			}
-//			myNetData.compact();
-//			myNetData.flip();
 
 			if(!myNetData.hasRemaining() && engine.getHandshakeStatus() == HandshakeStatus.NOT_HANDSHAKING) {
 				finishHandshake();
@@ -226,7 +222,8 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 		}
 
 		while(engine.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING) {
-			System.out.println("HS: " + engine.getHandshakeStatus());
+			getLogger().debug(String.format("Performing handshake operation. Status: %s", engine.getHandshakeStatus()));
+
 			switch (engine.getHandshakeStatus()) {
 				case NEED_UNWRAP:
 				{
@@ -235,7 +232,7 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 					peerNetData.flip();
 
 					if (res.getStatus() != Status.OK) {
-						System.out.println("E: " + res.getStatus());
+						getLogger().debug(String.format("Got non-OK status after handshake unwrap: %s", res.getStatus()));
 						handleHandshakeStatus(res.getStatus());
 						return;
 					}
@@ -249,7 +246,7 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 					myNetData.flip();
 
 					if (res.getStatus() != Status.OK) {
-						System.out.println("E: " + res.getStatus());
+						getLogger().debug(String.format("Got non-OK status after handshake wrap: %s", res.getStatus()));
 						handleHandshakeStatus(res.getStatus());
 						return;
 					}
@@ -290,18 +287,24 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 		switch(status) {
 			case BUFFER_OVERFLOW:
 			{
-				if (engine.getSession().getApplicationBufferSize() > peerAppData.capacity()) {
-					peerAppData.reallocate(engine.getSession().getApplicationBufferSize());
+				int desiredBufferSize = engine.getSession().getApplicationBufferSize();
+				if (desiredBufferSize > peerAppData.capacity()) {
+					getLogger().debug(String.format("Reallocating peer app data buffer with new size: %s", desiredBufferSize));
+					peerAppData.reallocate(desiredBufferSize);
 				}
 
 				break;
 			}
 			case BUFFER_UNDERFLOW:
-				if (engine.getSession().getPacketBufferSize() > peerNetData.capacity()) {
-					peerNetData.reallocate(engine.getSession().getPacketBufferSize());
+			{
+				int desiredBufferSize = engine.getSession().getPacketBufferSize();
+				if (desiredBufferSize > peerNetData.capacity()) {
+					getLogger().debug(String.format("Reallocating peer net data buffer with new size: %s", desiredBufferSize));
+					peerNetData.reallocate(desiredBufferSize);
 				}
 
 				break;
+			}
 			case CLOSED:
 				close();
 				break;

@@ -27,6 +27,8 @@ public class HttpReaders {
 
 	public static final Reader<HttpClientHeader> CLIENT_HEADER_READER = clientHeaderReader();
 
+	private HttpReaders() {}
+
 	private static Reader<HttpClientHeader> clientHeaderReader() {
 		Reader<HttpClientHeader> reader = new ReaderImpl<>();
 

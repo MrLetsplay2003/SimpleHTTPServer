@@ -52,7 +52,7 @@ public class HttpDataProcessor {
 		this.responseQueue = new LinkedBlockingQueue<>();
 		this.readerInstance = HttpReaders.CLIENT_HEADER_READER.createInstance();
 		readerInstance.onFinished(request -> {
-			System.out.println("GOT: " + request.getMethod() + " " + request.getPath() + " " + request.getProtocolVersion());
+			connection.getLogger().debug(String.format("Received HTTP request: %s %s %s", request.getMethod(), request.getPath(), request.getProtocolVersion()));
 			readerInstance.reset();
 			RequestAndResponse requestAndResponse = new RequestAndResponse(request);
 			connection.getServer().getExecutor().submit(() -> processRequest(requestAndResponse));
@@ -69,11 +69,13 @@ public class HttpDataProcessor {
 	}
 
 	public void readData(ByteBuffer buffer) throws IOException {
+		if(connection.getWebsocketConnection() != null) connection.getWebsocketConnection().readData(buffer);
 		readerInstance.read(buffer);
 	}
 
 	public void writeData(ByteBuffer buffer) throws IOException {
 		if(currentResponse == null && responseQueue.isEmpty()) {
+			if(connection.getWebsocketConnection() != null) connection.getWebsocketConnection().writeData(buffer);
 			return;
 		}
 
@@ -106,8 +108,8 @@ public class HttpDataProcessor {
 	}
 
 	private void processRequest(RequestAndResponse requestAndResponse) {
-		System.out.println("PROCESS");
 		HttpClientHeader request = requestAndResponse.request;
+		connection.getLogger().debug(String.format("Processing request: %s %s %s", request.getMethod(), request.getPath(), request.getProtocolVersion()));
 
 		HttpServerHeader sh = new HttpServerHeader(connection.getServer().getProtocolVersion(), HttpStatusCodes.OK_200, new HttpHeaderFields());
 		HttpRequestContext ctx = new HttpRequestContext(connection, request, sh);
@@ -149,8 +151,10 @@ public class HttpDataProcessor {
 		}
 
 		requestAndResponse.response = sh;
-		System.out.println("REQUEST PROCESSED");
+		connection.getLogger().debug(String.format("Finished processing request: %s %s %s", request.getMethod(), request.getPath(), request.getProtocolVersion()));
 		connection.startWriting();
+
+		// TODO: Respect connection (keep-alive/close) header
 	}
 
 	private HttpServerHeader createResponseFromException(HttpResponseException exception) {

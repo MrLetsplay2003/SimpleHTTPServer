@@ -12,9 +12,9 @@ public interface ReaderInstance<T> {
 
 	public T get() throws IOException;
 
-	public <R> void setRef(Ref<R> ref, R value) throws IllegalStateException;
+	public <R> void setRef(SimpleRef<R> ref, R value) throws IllegalStateException;
 
-	public <R> R getRef(Ref<R> ref) throws IllegalStateException;
+	public <R> R getRef(SimpleRef<R> ref) throws IllegalStateException;
 
 	public void reset();
 

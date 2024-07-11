@@ -3,9 +3,12 @@ package me.mrletsplay.simplehttpserver.reader;
 import java.io.IOException;
 import java.util.function.Supplier;
 
+import me.mrletsplay.simplehttpserver.util.UnsafeConsumer;
 import me.mrletsplay.simplehttpserver.util.UnsafeRunnable;
 
 public interface Expectation {
+
+	public void orElseRun(UnsafeConsumer<ReaderInstance<?>> run);
 
 	public void orElseRun(UnsafeRunnable run);
 

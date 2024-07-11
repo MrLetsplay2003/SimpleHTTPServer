@@ -1,13 +1,23 @@
 package me.mrletsplay.simplehttpserver.http.websocket;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.LinkedBlockingQueue;
 
+import me.mrletsplay.simplehttpserver.http.reader.WebSocketReaders;
 import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.BinaryFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
+import me.mrletsplay.simplehttpserver.http.websocket.frame.PongFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.TextFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketFrame;
+import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketOpCode;
+import me.mrletsplay.simplehttpserver.reader.ReaderInstance;
 
 public class WebSocketConnection {
 
@@ -17,13 +27,24 @@ public class WebSocketConnection {
 	private boolean hasSentCloseFrame;
 	private boolean closed;
 
+	private Object attachment;
+
+	private ReaderInstance<WebSocketFrame> readerInstance;
 	private WebSocketFrame incompleteFrame;
 
-	private Object attachment;
+	private LinkedBlockingQueue<WebSocketFrame> outgoingQueue;
+	private ReadableByteChannel currentOutgoingFrame;
 
 	public WebSocketConnection(HttpConnection httpConnection, WebSocketEndpoint endpoint) {
 		this.httpConnection = httpConnection;
 		this.endpoint = endpoint;
+		this.readerInstance = WebSocketReaders.FRAME_READER.createInstance();
+		this.outgoingQueue = new LinkedBlockingQueue<>();
+		readerInstance.onFinished(frame -> {
+			httpConnection.getLogger().debug(String.format("Received WebSocket frame: %s (fin: %s)", frame.getOpCode(), frame.isFin()));
+			readerInstance.reset();
+			httpConnection.getServer().getExecutor().submit(() -> handleFrame(frame));
+		});
 	}
 
 	public HttpConnection getHttpConnection() {
@@ -45,14 +66,8 @@ public class WebSocketConnection {
 
 	public void send(WebSocketFrame frame) {
 		if(closed) throw new WebSocketException("Connection is closed");
-//		try {
-//			for(WebSocketFrame f : frame.split()) { TODO
-//				f.write(httpConnection.getSocket().getOutputStream());
-//			}
-//			httpConnection.getSocket().getOutputStream().flush();
-//		}catch(IOException e) {
-//			throw new WebSocketException("Failed to send frame", e);
-//		}
+		outgoingQueue.offer(frame);
+		httpConnection.startWriting();
 	}
 
 	public void sendText(String message) {
@@ -95,58 +110,70 @@ public class WebSocketConnection {
 		close(1000);
 	}
 
-	public void receive() throws IOException {
-//		WebSocketFrame frame; TODO
-//		frame = WebSocketFrame.read(httpConnection.getSocket().getInputStream());
-//		if(frame == null) {
-//			// Mark connection as dead
-//			httpConnection.setDead();
-//			forceClose();
-//			return;
-//		}
-//
-//		endpoint.onFrameReceived(this, frame);
-//
-//		if(frame.getOpCode().isControl()) {
-//			switch(frame.getOpCode()) {
-//				case CONNECTION_CLOSE:
-//					if(hasSentCloseFrame) {
-//						forceClose((CloseFrame) frame);
-//						return;
-//					}
-//
-//					close();
-//					return;
-//				case PING:
-//					endpoint.onPing(this, frame.getPayload());
-//					send(new PongFrame(true, false, false, false, new byte[0]));
-//					return;
-//				case PONG:
-//					endpoint.onPong(this, frame.getPayload());
-//					return;
-//				default:
-//					throw new WebSocketException("Unsupported control frame: " + frame.getOpCode());
-//			}
-//		}
-//
-//		if(incompleteFrame != null) {
-//			if(frame.getOpCode() != WebSocketOpCode.CONTINUATION_FRAME) throw new WebSocketException("Interleaving of message frames is not allowed");
-//			incompleteFrame.appendPayload(frame.getPayload());
-//			if(frame.isFin()) {
-//				handleCompleteFrame(frame);
-//				incompleteFrame = null;
-//			}
-//			return;
-//		}
-//
-//		if(frame.getOpCode() == WebSocketOpCode.CONTINUATION_FRAME) throw new WebSocketException("Received continuation frame without prior incomplete frame");
-//
-//		if(!frame.isFin()) {
-//			incompleteFrame = frame;
-//			return;
-//		}
-//
-//		handleCompleteFrame(frame);
+	public void readData(ByteBuffer buffer) throws IOException {
+		readerInstance.read(buffer);
+	}
+
+	public void writeData(ByteBuffer buffer) throws IOException {
+		if(currentOutgoingFrame == null && outgoingQueue.isEmpty()) {
+			return;
+		}
+
+		if(currentOutgoingFrame == null) {
+			WebSocketFrame outgoing = outgoingQueue.poll();
+			ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+			outgoing.write(bOut);
+			currentOutgoingFrame = Channels.newChannel(new ByteArrayInputStream(bOut.toByteArray()));
+		}
+
+		if(currentOutgoingFrame.read(buffer) == -1) {
+			currentOutgoingFrame = null;
+		}
+	}
+
+	private void handleFrame(WebSocketFrame frame) {
+		endpoint.onFrameReceived(this, frame);
+
+		if(frame.getOpCode().isControl()) {
+			switch(frame.getOpCode()) {
+				case CONNECTION_CLOSE:
+					if(hasSentCloseFrame) {
+						forceClose((CloseFrame) frame);
+						return;
+					}
+
+					close();
+					return;
+				case PING:
+					endpoint.onPing(this, frame.getPayload());
+					send(new PongFrame(true, false, false, false, new byte[0]));
+					return;
+				case PONG:
+					endpoint.onPong(this, frame.getPayload());
+					return;
+				default:
+					throw new WebSocketException("Unsupported control frame: " + frame.getOpCode());
+			}
+		}
+
+		if(incompleteFrame != null) {
+			if(frame.getOpCode() != WebSocketOpCode.CONTINUATION_FRAME) throw new WebSocketException("Interleaving of message frames is not allowed");
+			incompleteFrame.appendPayload(frame.getPayload());
+			if(frame.isFin()) {
+				handleCompleteFrame(frame);
+				incompleteFrame = null;
+			}
+			return;
+		}
+
+		if(frame.getOpCode() == WebSocketOpCode.CONTINUATION_FRAME) throw new WebSocketException("Received continuation frame without prior incomplete frame");
+
+		if(!frame.isFin()) {
+			incompleteFrame = frame;
+			return;
+		}
+
+		handleCompleteFrame(frame);
 	}
 
 	private void handleCompleteFrame(WebSocketFrame frame) {

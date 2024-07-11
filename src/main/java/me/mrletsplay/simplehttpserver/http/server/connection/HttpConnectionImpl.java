@@ -91,6 +91,7 @@ public class HttpConnectionImpl extends AbstractBufferedConnection implements Ht
 
 	@Override
 	public void close() {
+		// TODO: wait for queued responses to be sent before closing
 		dataProcessor.close();
 		super.close();
 	}
