@@ -243,7 +243,7 @@ public class ReaderImpl<T> implements Reader<T> {
 		}
 
 		@Override
-		public T get() throws IOException {
+		public T get() throws IllegalStateException {
 			if(!finished) throw new IllegalStateException("Reader is not finished");
 			return value;
 		}

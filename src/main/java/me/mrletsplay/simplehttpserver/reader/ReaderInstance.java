@@ -10,7 +10,7 @@ public interface ReaderInstance<T> {
 
 	public ReaderInstance<T> onFinished(Consumer<T> consumer);
 
-	public T get() throws IOException;
+	public T get() throws IllegalStateException;
 
 	public <R> void setRef(SimpleRef<R> ref, R value) throws IllegalStateException;
 
