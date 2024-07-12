@@ -81,22 +81,18 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 	private void processAppData() throws IOException {
 		if(!getSelectionKey().isValid()) return;
 
-		int ops = getSelectionKey().interestOps();
-		boolean read = (ops & SelectionKey.OP_READ) == SelectionKey.OP_READ;
-		boolean write = (ops & SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE;
-
-		getLogger().trace(String.format("Processing app data (read: %s, write: %s)", read, write));
+		getLogger().trace(String.format("Processing app data"));
 
 		unwrapPeerData();
 		peerAppData.flip();
-		if(read && peerAppData.hasRemaining()) {
+		if(peerAppData.hasRemaining()) {
 			getLogger().trace("Bytes to read: " + peerAppData.remaining());
 			dataProcessor.readData(peerAppData.read());
 		}
 		peerAppData.flip();
 
 		myAppData.flip();
-		if(write && myAppData.hasRemaining()) {
+		if(myAppData.hasRemaining()) {
 			dataProcessor.writeData(myAppData.write());
 		}
 		myAppData.flip();
@@ -145,15 +141,15 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 		}
 
 		processAppData();
+		if(!myNetData.hasRemaining()) {
+			stopWriting();
+			return;
+		}
 
 		getLogger().trace(String.format("Can write up to %s bytes", myNetData.remaining()));
 		if(getSocket().write(myNetData.read()) == -1) {
 			close();
 			return;
-		}
-
-		if(!myNetData.hasRemaining()) {
-			stopWriting();
 		}
 	}
 

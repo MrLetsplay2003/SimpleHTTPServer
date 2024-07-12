@@ -94,7 +94,7 @@ public class WebSocketReaders {
 				byte[] bs = bytes.get(instance);
 				long value = 0;
 				for(int i = 0; i < n; i++) {
-					value |= ((long) bs[i]) << ((n - i - 1) * 8);
+					value |= ((long) (bs[i] & 0xFF)) << ((n - i - 1) * 8);
 				}
 
 				if(value < 0 || value > Integer.MAX_VALUE) throw new InvalidFrameException("Frame too big: " + value + " > " + Integer.MAX_VALUE);
