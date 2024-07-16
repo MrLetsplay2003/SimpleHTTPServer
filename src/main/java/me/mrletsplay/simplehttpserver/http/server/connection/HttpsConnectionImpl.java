@@ -103,16 +103,16 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 	public void readData() throws IOException {
 		getLogger().trace("Reading data from socket. Status: " + engine.getHandshakeStatus());
 
-		if(!handshakeDone) {
-			performHandshake(true, false);
-			setHandshakeInterestOps();
-			if(!handshakeDone) return;
-		}
-
 		if(peerNetData.remaining() == 0) throw new IOException("Buffer is full");
 		if(getSocket().read(peerNetData.write()) == -1) {
 			close();
 			return;
+		}
+
+		if(!handshakeDone) {
+			performHandshake(true, false);
+			setHandshakeInterestOps();
+			if(!handshakeDone) return;
 		}
 
 		processAppData();
@@ -137,10 +137,12 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 		if(!handshakeDone) {
 			performHandshake(false, true);
 			setHandshakeInterestOps();
-			if(!handshakeDone) return;
 		}
 
-		processAppData();
+		if(handshakeDone) {
+			processAppData();
+		}
+
 		if(!myNetData.hasRemaining()) {
 			stopWriting();
 			return;
@@ -194,29 +196,12 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 	}
 
 	protected void finishHandshake() {
+		getLogger().debug("Handshake finished");
 		handshakeDone = true;
 		getSelectionKey().interestOps(SelectionKey.OP_READ);
 	}
 
 	protected void performHandshake(boolean canRead, boolean canWrite) throws IOException {
-		if (canWrite && myNetData.hasRemaining()) {
-			if(getSocket().write(myNetData.read()) == -1) {
-				close();
-				return;
-			}
-
-			if(!myNetData.hasRemaining() && engine.getHandshakeStatus() == HandshakeStatus.NOT_HANDSHAKING) {
-				finishHandshake();
-			}
-
-			return;
-		}
-
-		if (canRead && getSocket().read(peerNetData.write()) == -1) {
-			close();
-			return;
-		}
-
 		while(engine.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING) {
 			getLogger().debug(String.format("Performing handshake operation. Status: %s", engine.getHandshakeStatus()));
 
@@ -240,6 +225,7 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 					myNetData.flip();
 					SSLEngineResult res = engine.wrap(myAppData.read(), myNetData.write());
 					myNetData.flip();
+					startWriting();
 
 					if (res.getStatus() != Status.OK) {
 						getLogger().debug(String.format("Got non-OK status after handshake wrap: %s", res.getStatus()));
@@ -276,6 +262,10 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 					// Doesn't apply here
 					return;
 			}
+		}
+
+		if(engine.getHandshakeStatus() == HandshakeStatus.NOT_HANDSHAKING) {
+			finishHandshake();
 		}
 	}
 
