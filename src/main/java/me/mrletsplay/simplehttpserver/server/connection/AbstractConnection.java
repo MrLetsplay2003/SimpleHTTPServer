@@ -8,11 +8,13 @@ import me.mrletsplay.simplehttpserver.server.Server;
 public abstract class AbstractConnection implements Connection {
 
 	private Server server;
+	private SelectionKey selectionKey;
 	private SocketChannel socket;
 	private boolean dead;
 
-	public AbstractConnection(Server server, SocketChannel socket) {
+	public AbstractConnection(Server server, SelectionKey selectionKey, SocketChannel socket) {
 		this.server = server;
+		this.selectionKey = selectionKey;
 		this.socket = socket;
 	}
 
@@ -28,7 +30,7 @@ public abstract class AbstractConnection implements Connection {
 
 	@Override
 	public SelectionKey getSelectionKey() {
-		return getSocket().keyFor(getServer().getSelector());
+		return selectionKey;
 	}
 
 	@Override

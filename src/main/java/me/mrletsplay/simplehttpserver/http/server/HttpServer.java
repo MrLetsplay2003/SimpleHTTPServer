@@ -1,5 +1,6 @@
 package me.mrletsplay.simplehttpserver.http.server;
 
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,8 +54,8 @@ public class HttpServer extends AbstractServer {
 	}
 
 	@Override
-	protected Connection createConnection(SocketChannel socket) {
-		return new HttpConnectionImpl(this, socket);
+	protected Connection createConnection(SelectionKey selectionKey, SocketChannel socket) {
+		return new HttpConnectionImpl(this,  selectionKey, socket);
 	}
 
 	@Override

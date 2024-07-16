@@ -12,12 +12,14 @@ public class AbstractServerConfiguration {
 	protected int port;
 	protected Logger logger;
 	protected int poolSize;
+	protected int ioWorkers;
 
-	protected AbstractServerConfiguration(String host, int port, Logger logger, int poolSize) {
+	protected AbstractServerConfiguration(String host, int port, Logger logger, int poolSize, int ioWorkers) {
 		this.host = host;
 		this.port = port;
 		this.logger = logger;
 		this.poolSize = poolSize;
+		this.ioWorkers = ioWorkers;
 	}
 
 	public String getHost() {
@@ -36,12 +38,17 @@ public class AbstractServerConfiguration {
 		return poolSize;
 	}
 
+	public int getIOWorkers() {
+		return ioWorkers;
+	}
+
 	public static abstract class AbstractServerConfigurationBuilder<T extends AbstractServerConfiguration, Self extends Builder<T,Self>> implements Builder<T, Self>{
 
 		protected String host;
 		protected int port;
 		protected Logger logger;
 		protected int poolSize;
+		protected int ioWorkers;
 
 		protected AbstractServerConfigurationBuilder() {}
 
@@ -74,11 +81,18 @@ public class AbstractServerConfiguration {
 			return getSelf();
 		}
 
+		public Self ioWorkers(int ioWorkers) {
+			this.ioWorkers = ioWorkers;
+			return getSelf();
+		}
+
 		protected void verify() {
 			if(host == null) throw new IllegalStateException("Host must be set");
 			if(port == 0) throw new IllegalStateException("Port must be set to a nonzero value");
 			if(logger == null) logger = LoggerFactory.getLogger(HttpServer.class);
 			if(poolSize <= 0) throw new IllegalStateException("Pool size must be greater than 0");
+			if(ioWorkers <= 0) throw new IllegalStateException("Number of I/O workers must be greater than 0");
+			if(poolSize <= ioWorkers) throw new IllegalStateException("Pool size must be greater than number of I/O workers");
 		}
 
 	}

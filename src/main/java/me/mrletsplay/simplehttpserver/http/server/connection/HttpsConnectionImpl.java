@@ -34,8 +34,8 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 
 	private HttpDataProcessor dataProcessor;
 
-	public HttpsConnectionImpl(HttpServer server, SocketChannel socket, SSLContext sslContext) {
-		super(server, socket);
+	public HttpsConnectionImpl(HttpServer server, SelectionKey selectionKey, SocketChannel socket, SSLContext sslContext) {
+		super(server, selectionKey, socket);
 
 		handshakeDone = false;
 
@@ -251,7 +251,7 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 
 							if(remaining.decrementAndGet() == 0) {
 								setHandshakeInterestOps();
-								getServer().getSelector().wakeup();
+								getSelectionKey().selector().wakeup();
 							}
 						});
 					}

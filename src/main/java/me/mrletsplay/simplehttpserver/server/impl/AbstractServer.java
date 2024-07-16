@@ -24,9 +24,10 @@ public abstract class AbstractServer implements Server {
 
 	private AbstractServerConfiguration configuration;
 	private ServerSocketChannel socket;
-	private Selector selector;
+	private Selector[] selectors;
 	private ConnectionManager manager;
 	private ExecutorService executor;
+	private int i = 0;
 
 	public AbstractServer(AbstractServerConfiguration configuration) {
 		this.configuration = configuration;
@@ -39,31 +40,38 @@ public abstract class AbstractServer implements Server {
 		return socket;
 	}
 
-	protected abstract Connection createConnection(SocketChannel socket);
+	protected abstract Connection createConnection(SelectionKey selectionKey, SocketChannel socket);
 
 	@Override
 	public void start() {
 		try {
-			socket = createSocket();
-			selector = Selector.open();
-			socket.register(selector, SelectionKey.OP_ACCEPT);
+			selectors = new Selector[configuration.getIOWorkers()];
+			for(int i = 0; i < configuration.getIOWorkers(); i++) {
+				selectors[i] = Selector.open();
+			}
 
-			executor = Executors.newFixedThreadPool(10);
-			executor.execute(() -> {
-				while(!executor.isShutdown()) {
-					try {
-						workLoop();
-					}catch(Exception e) {
-						getLogger().error("Error while accepting connection", e);
+			socket = createSocket();
+			socket.register(selectors[0], SelectionKey.OP_ACCEPT);
+
+			executor = Executors.newFixedThreadPool(configuration.getPoolSize());
+
+			for(Selector selector : selectors) {
+				executor.execute(() -> {
+					while(!executor.isShutdown()) {
+						try {
+							workLoop(selector);
+						}catch(Exception e) {
+							getLogger().error("Error while accepting connection", e);
+						}
 					}
-				}
-			});
+				});
+			}
 		} catch (IOException e) {
 			throw new ServerException("Error while starting server", e);
 		}
 	}
 
-	private void workLoop() throws IOException {
+	private void workLoop(Selector selector) throws IOException {
 		selector.select(1000);
 		if(executor.isShutdown()) return;
 
@@ -73,8 +81,7 @@ public abstract class AbstractServer implements Server {
 			SelectionKey key = iterator.next();
 
 			if(key.isValid() && key.isAcceptable()) {
-				Connection con = acceptConnection();
-				con.getSocket().register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, con);
+				acceptConnection();
 			}
 
 			if(key.attachment() instanceof Connection) {
@@ -107,13 +114,15 @@ public abstract class AbstractServer implements Server {
 		}
 	}
 
-	private Connection acceptConnection() throws IOException {
+	private void acceptConnection() throws IOException {
 		SocketChannel client = socket.accept();
 		client.configureBlocking(false);
 
-		Connection con = createConnection(client);
+		i = (i + 1) % selectors.length;
+		SelectionKey key = client.register(selectors[i], SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+		Connection con = createConnection(key, client); // TODO: handle error in createConnection, unregister
+		key.attach(con);
 		manager.accept(con);
-		return con;
 	}
 
 	@Override
@@ -162,25 +171,15 @@ public abstract class AbstractServer implements Server {
 	}
 
 	@Override
-	public void setExecutor(ExecutorService executor) throws IllegalStateException {
-		if(isRunning()) throw new IllegalStateException("Server is running");
-		this.executor = executor;
-	}
-
-	@Override
 	public ExecutorService getExecutor() {
 		return executor;
-	}
-
-	@Override
-	public Selector getSelector() {
-		return selector;
 	}
 
 	@Override
 	public void shutdown() {
 		try {
 			executor.shutdown();
+			for(Selector s : selectors) s.close();
 			manager.closeAllConnections();
 			try {
 				if(!executor.awaitTermination(5L, TimeUnit.SECONDS)) executor.shutdownNow();

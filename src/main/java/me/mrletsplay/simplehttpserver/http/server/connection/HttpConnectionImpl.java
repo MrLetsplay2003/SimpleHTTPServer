@@ -2,6 +2,7 @@ package me.mrletsplay.simplehttpserver.http.server.connection;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
 import me.mrletsplay.simplehttpserver.http.server.HttpServer;
@@ -12,8 +13,8 @@ public class HttpConnectionImpl extends AbstractBufferedConnection implements Ht
 
 	private HttpDataProcessor dataProcessor;
 
-	public HttpConnectionImpl(HttpServer server, SocketChannel socket) {
-		super(server, socket);
+	public HttpConnectionImpl(HttpServer server, SelectionKey selectionKey, SocketChannel socket) {
+		super(server, selectionKey, socket);
 		this.dataProcessor = new HttpDataProcessor(this);
 	}
 

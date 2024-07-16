@@ -2,6 +2,7 @@ package me.mrletsplay.simplehttpserver.server.connection;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
 import me.mrletsplay.simplehttpserver.server.Server;
@@ -14,8 +15,8 @@ public abstract class AbstractBufferedConnection extends AbstractConnection {
 		readBuffer,
 		writeBuffer;
 
-	public AbstractBufferedConnection(Server server, SocketChannel socket) {
-		super(server, socket);
+	public AbstractBufferedConnection(Server server, SelectionKey selectionKey, SocketChannel socket) {
+		super(server, selectionKey, socket);
 		this.readBuffer = ByteBuffer.allocate(BUFFER_SIZE);
 		this.writeBuffer = ByteBuffer.allocate(BUFFER_SIZE);
 		writeBuffer.limit(0);

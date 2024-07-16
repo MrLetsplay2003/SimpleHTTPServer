@@ -13,8 +13,8 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 	protected CorsConfiguration defaultCorsConfiguration;
 	protected long readTimeout;
 
-	protected HttpServerConfiguration(String host, int port, Logger logger, int poolSize, boolean debugMode, CorsConfiguration defaultCorsConfiguration, long readTimeout) {
-		super(host, port, logger, poolSize);
+	protected HttpServerConfiguration(String host, int port, Logger logger, int poolSize, int ioWorkers, boolean debugMode, CorsConfiguration defaultCorsConfiguration, long readTimeout) {
+		super(host, port, logger, poolSize, ioWorkers);
 		this.debugMode = debugMode;
 		this.defaultCorsConfiguration = defaultCorsConfiguration;
 		this.readTimeout = readTimeout;
@@ -67,7 +67,7 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 		@Override
 		public HttpServerConfiguration create() throws IllegalStateException {
 			verify();
-			return new HttpServerConfiguration(host, port, logger, poolSize, debugMode, defaultCorsConfiguration, readTimeout);
+			return new HttpServerConfiguration(host, port, logger, poolSize, ioWorkers, debugMode, defaultCorsConfiguration, readTimeout);
 		}
 
 	}

@@ -2,6 +2,7 @@ package me.mrletsplay.simplehttpserver.http.server;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.security.GeneralSecurityException;
 
@@ -46,8 +47,8 @@ public class HttpsServer extends HttpServer {
 	}
 
 	@Override
-	protected Connection createConnection(SocketChannel socket) {
-		return new HttpsConnectionImpl(this, socket, sslContext);
+	protected Connection createConnection(SelectionKey selectionKey, SocketChannel socket) {
+		return new HttpsConnectionImpl(this, selectionKey, socket, sslContext);
 	}
 
 	public static HttpsServerConfiguration.Builder newConfigurationBuilder() {

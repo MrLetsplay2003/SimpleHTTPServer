@@ -31,7 +31,7 @@ public interface Connection {
 
 	public default void startReading() {
 		getSelectionKey().interestOpsOr(SelectionKey.OP_READ);
-		getServer().getSelector().wakeup();
+		getSelectionKey().selector().wakeup();
 	}
 
 	public default void stopReading() {
@@ -40,7 +40,7 @@ public interface Connection {
 
 	public default void startWriting() {
 		getSelectionKey().interestOpsOr(SelectionKey.OP_WRITE);
-		getServer().getSelector().wakeup();
+		getSelectionKey().selector().wakeup();
 	}
 
 	public default void stopWriting() {
