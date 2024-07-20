@@ -56,7 +56,7 @@ public abstract class AbstractServer implements Server {
 			executor = Executors.newFixedThreadPool(configuration.getPoolSize());
 
 			for(Selector selector : selectors) {
-				executor.execute(() -> {
+				executor.submit(() -> {
 					while(!executor.isShutdown()) {
 						try {
 							workLoop(selector);
@@ -120,6 +120,7 @@ public abstract class AbstractServer implements Server {
 
 		i = (i + 1) % selectors.length;
 		SelectionKey key = client.register(selectors[i], SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+		key.selector().wakeup();
 		Connection con = createConnection(key, client); // TODO: handle error in createConnection, unregister
 		key.attach(con);
 		manager.accept(con);

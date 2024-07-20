@@ -13,6 +13,8 @@ public interface Operation extends OperationCallback {
 
 	public Operation copy();
 
+	public void reset();
+
 	public default Operation then(Operation other) {
 		return Operations.allOf(this, other);
 	}

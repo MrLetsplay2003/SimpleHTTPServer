@@ -22,6 +22,11 @@ public class Operations {
 				return this;
 			}
 
+			@Override
+			public void reset() {
+
+			}
+
 		};
 	}
 
@@ -86,7 +91,7 @@ public class Operations {
 
 		public CombinedOperation(Operation... operations) {
 			this.operations = operations;
-			this.i = 0;
+			reset();
 		}
 
 		@Override
@@ -105,6 +110,12 @@ public class Operations {
 			return new CombinedOperation(Arrays.stream(operations).map(Operation::copy).toArray(Operation[]::new));
 		}
 
+		@Override
+		public void reset() {
+			for(Operation op : operations) op.reset();
+			i = 0;
+		}
+
 	}
 
 	private static class ReadIntOperation implements Operation {
@@ -115,8 +126,7 @@ public class Operations {
 
 		public ReadIntOperation(SimpleRef<Integer> ref) {
 			this.ref = ref;
-			this.value = 0;
-			this.i = 4;
+			reset();
 		}
 
 		@Override
@@ -139,6 +149,12 @@ public class Operations {
 			return new ReadIntOperation(ref);
 		}
 
+		@Override
+		public void reset() {
+			this.value = 0;
+			this.i = 4;
+		}
+
 	}
 
 	private static class ReadBytesOperation implements Operation {
@@ -150,7 +166,7 @@ public class Operations {
 		public ReadBytesOperation(SimpleRef<byte[]> ref, int n) {
 			this.ref = ref;
 			this.bytes = new byte[n];
-			this.i = 0;
+			reset();
 		}
 
 		@Override
@@ -172,6 +188,11 @@ public class Operations {
 			return new ReadBytesOperation(ref, bytes.length);
 		}
 
+		@Override
+		public void reset() {
+			i = 0;
+		}
+
 	}
 
 	private static class ReadBytesUntilOperation implements Operation {
@@ -185,7 +206,7 @@ public class Operations {
 			this.ref = ref;
 			this.delimiter = delimiter;
 			this.bytes = new byte[limit];
-			this.i = 0;
+			reset();
 		}
 
 		@Override
@@ -209,6 +230,11 @@ public class Operations {
 			return new ReadBytesUntilOperation(ref, delimiter, bytes.length);
 		}
 
+		@Override
+		public void reset() {
+			i = 0;
+		}
+
 	}
 
 	private static class LazyOperation implements Operation {
@@ -218,6 +244,7 @@ public class Operations {
 
 		public LazyOperation(Ref<Operation> operationSupplier) {
 			this.operationSupplier = operationSupplier;
+			reset();
 		}
 
 		@Override
@@ -231,6 +258,11 @@ public class Operations {
 			return new LazyOperation(operationSupplier);
 		}
 
+		@Override
+		public void reset() {
+			this.operation = null;
+		}
+
 	}
 
 	private static class BranchOperation implements Operation {
@@ -242,7 +274,7 @@ public class Operations {
 		public BranchOperation(Ref<Integer> value, Operation... branches) {
 			this.value = value;
 			this.branches = branches;
-			this.i = -1;
+			reset();
 		}
 
 		@Override
@@ -257,25 +289,31 @@ public class Operations {
 			return new BranchOperation(value, Arrays.stream(branches).map(op -> op == null ? null : op.copy()).toArray(Operation[]::new));
 		}
 
+		@Override
+		public void reset() {
+			for(Operation op : branches) {
+				if(op != null) op.reset();
+			}
+			this.i = -1;
+		}
+
 	}
 
 	private static class LoopUntilOperation implements Operation {
 
 		private Ref<Boolean> condition;
 		private Operation body;
-		private Operation current;
 
 		public LoopUntilOperation(Ref<Boolean> condition, Operation body) {
 			this.condition = condition;
 			this.body = body;
+			reset();
 		}
 
 		@Override
 		public boolean read(ReaderInstance<?> instance, ByteBuffer buf) throws IOException {
-			if(current == null) current = body.copy();
-
-			if(current.read(instance, buf)) {
-				current = null;
+			if(body.read(instance, buf)) {
+				body.reset();
 				if(condition.get(instance)) return true;
 			}
 
@@ -284,7 +322,12 @@ public class Operations {
 
 		@Override
 		public Operation copy() {
-			return new LoopUntilOperation(condition, body);
+			return new LoopUntilOperation(condition, body.copy());
+		}
+
+		@Override
+		public void reset() {
+			body.reset();
 		}
 
 	}
@@ -298,21 +341,28 @@ public class Operations {
 		public ReaderOperation(SimpleRef<T> ref, Reader<? extends T> reader) {
 			this.ref = ref;
 			this.reader = reader;
+			this.readerInstance = reader.createInstance();
+			reset();
 		}
 
 		@Override
 		public boolean read(ReaderInstance<?> instance, ByteBuffer buf) throws IOException {
-			if(readerInstance == null) {
-				readerInstance = reader.createInstance();
-				if(ref != null) this.readerInstance.onFinished(value -> ref.set(instance, value));
+			if(readerInstance.read(buf)) {
+				ref.set(instance, readerInstance.get());
+				return true;
 			}
 
-			return readerInstance.read(buf);
+			return false;
 		}
 
 		@Override
 		public Operation copy() {
 			return new ReaderOperation<>(ref, reader);
+		}
+
+		@Override
+		public void reset() {
+			readerInstance.reset();
 		}
 
 	}

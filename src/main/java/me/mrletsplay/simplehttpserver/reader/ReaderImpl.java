@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import me.mrletsplay.simplehttpserver.util.UnsafeConsumer;
 import me.mrletsplay.simplehttpserver.util.UnsafeFunction;
@@ -202,6 +201,14 @@ public class ReaderImpl<T> implements Reader<T> {
 		private Consumer<T> onFinished;
 
 		public Instance() {
+			this.stackTraces = new HashMap<>();
+			this.operations = new ArrayList<>(ReaderImpl.this.operations.size());
+			for(Operation op : ReaderImpl.this.operations) {
+				Operation copy = op.copy();
+				this.operations.add(copy);
+				this.stackTraces.put(copy, ReaderImpl.this.stackTraces.get(op));
+			}
+			this.refValues = new HashMap<>();
 			reset();
 		}
 
@@ -249,7 +256,7 @@ public class ReaderImpl<T> implements Reader<T> {
 		}
 
 		@Override
-		public <R> void setRef(SimpleRef<R> ref, R value) throws IllegalStateException {
+		public <R> void setRef(SimpleRef<R> ref, R value) {
 			refValues.put(ref, value);
 		}
 
@@ -260,16 +267,15 @@ public class ReaderImpl<T> implements Reader<T> {
 			return (R) refValues.get(ref);
 		}
 
+		public boolean isRefSet(SimpleRef<?> ref) {
+			return refValues.containsKey(ref);
+		}
+
 		@Override
 		public void reset() {
-			this.stackTraces = new HashMap<>();
-			this.operations = ReaderImpl.this.operations.stream().map(op -> {
-				Operation copy = op.copy();
-				stackTraces.put(copy, ReaderImpl.this.stackTraces.get(op));
-				return copy;
-			}).collect(Collectors.toList());
+			for(Operation op : operations) op.reset();
 			this.idx = 0;
-			this.refValues = new HashMap<>();
+			this.refValues.clear();
 			this.finished = false;
 			this.value = null;
 		}
