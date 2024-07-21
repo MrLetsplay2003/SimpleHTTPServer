@@ -20,6 +20,8 @@ public class HttpServerTest {
 		HttpServer server = new HttpServer(new HttpServerConfiguration.Builder()
 			.port(12345)
 			.host("127.0.0.1")
+			.poolSize(2)
+			.ioWorkers(1)
 			.debugMode(true)
 			.create());
 

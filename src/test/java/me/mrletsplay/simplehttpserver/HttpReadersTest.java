@@ -53,7 +53,7 @@ public class HttpReadersTest {
 		assertEquals("example.com", header.getFields().getFirst("Host"));
 		assertEquals("sus", header.getFields().getFirst("X-Amogus"));
 		assertEquals(List.of("b", "c"), header.getFields().getAll("a"));
-		System.out.println(header.getPostData());
+
 		assertNull(header.getPostData().getRaw());
 	}
 
