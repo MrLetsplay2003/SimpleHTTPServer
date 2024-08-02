@@ -17,7 +17,7 @@ import me.mrletsplay.simplehttpserver.http.websocket.frame.PongFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.TextFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketOpCode;
-import me.mrletsplay.simplehttpserver.reader.ReaderInstance;
+import me.mrletsplay.simplenio.reader.ReaderInstance;
 
 public class WebSocketConnection {
 

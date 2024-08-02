@@ -9,12 +9,12 @@ import me.mrletsplay.simplehttpserver.http.websocket.frame.PongFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.TextFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketOpCode;
-import me.mrletsplay.simplehttpserver.reader.Operation;
-import me.mrletsplay.simplehttpserver.reader.Operations;
-import me.mrletsplay.simplehttpserver.reader.Reader;
-import me.mrletsplay.simplehttpserver.reader.ReaderImpl;
-import me.mrletsplay.simplehttpserver.reader.Ref;
-import me.mrletsplay.simplehttpserver.reader.SimpleRef;
+import me.mrletsplay.simplenio.reader.Operation;
+import me.mrletsplay.simplenio.reader.Operations;
+import me.mrletsplay.simplenio.reader.Reader;
+import me.mrletsplay.simplenio.reader.ReaderImpl;
+import me.mrletsplay.simplenio.reader.Ref;
+import me.mrletsplay.simplenio.reader.SimpleRef;
 
 public class WebSocketReaders {
 

@@ -11,12 +11,12 @@ import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
 import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.header.HttpHeaderFields;
 import me.mrletsplay.simplehttpserver.http.header.HttpUrlPath;
-import me.mrletsplay.simplehttpserver.reader.Operation;
-import me.mrletsplay.simplehttpserver.reader.Operations;
-import me.mrletsplay.simplehttpserver.reader.Reader;
-import me.mrletsplay.simplehttpserver.reader.ReaderImpl;
-import me.mrletsplay.simplehttpserver.reader.Ref;
-import me.mrletsplay.simplehttpserver.reader.SimpleRef;
+import me.mrletsplay.simplenio.reader.Operation;
+import me.mrletsplay.simplenio.reader.Operations;
+import me.mrletsplay.simplenio.reader.Reader;
+import me.mrletsplay.simplenio.reader.ReaderImpl;
+import me.mrletsplay.simplenio.reader.Ref;
+import me.mrletsplay.simplenio.reader.SimpleRef;
 
 public class HttpReaders {
 

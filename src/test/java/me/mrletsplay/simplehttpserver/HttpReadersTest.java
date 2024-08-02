@@ -18,8 +18,8 @@ import me.mrletsplay.simplehttpserver.http.HttpRequestMethod;
 import me.mrletsplay.simplehttpserver.http.header.DefaultClientContentTypes;
 import me.mrletsplay.simplehttpserver.http.header.HttpClientHeader;
 import me.mrletsplay.simplehttpserver.http.reader.HttpReaders;
-import me.mrletsplay.simplehttpserver.reader.Reader;
-import me.mrletsplay.simplehttpserver.reader.ReaderInstance;
+import me.mrletsplay.simplenio.reader.Reader;
+import me.mrletsplay.simplenio.reader.ReaderInstance;
 
 public class HttpReadersTest {
 

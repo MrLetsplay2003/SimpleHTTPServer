@@ -33,7 +33,7 @@ import me.mrletsplay.simplehttpserver.http.request.RequestProcessor;
 import me.mrletsplay.simplehttpserver.http.util.MimeType;
 import me.mrletsplay.simplehttpserver.http.websocket.WebSocketConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
-import me.mrletsplay.simplehttpserver.reader.ReaderInstance;
+import me.mrletsplay.simplenio.reader.ReaderInstance;
 
 public class HttpDataProcessor {
 
