@@ -1,8 +1,15 @@
 package me.mrletsplay.simplehttpserver.http.websocket;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.LinkedBlockingQueue;
 
+import me.mrletsplay.simplehttpserver.http.reader.WebSocketReaders;
 import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.BinaryFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
@@ -10,6 +17,7 @@ import me.mrletsplay.simplehttpserver.http.websocket.frame.PongFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.TextFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.WebSocketOpCode;
+import me.mrletsplay.simplenio.reader.ReaderInstance;
 
 public class WebSocketConnection {
 
@@ -19,13 +27,24 @@ public class WebSocketConnection {
 	private boolean hasSentCloseFrame;
 	private boolean closed;
 
+	private Object attachment;
+
+	private ReaderInstance<WebSocketFrame> readerInstance;
 	private WebSocketFrame incompleteFrame;
 
-	private Object attachment;
+	private LinkedBlockingQueue<WebSocketFrame> outgoingQueue;
+	private ReadableByteChannel currentOutgoingFrame;
 
 	public WebSocketConnection(HttpConnection httpConnection, WebSocketEndpoint endpoint) {
 		this.httpConnection = httpConnection;
 		this.endpoint = endpoint;
+		this.readerInstance = WebSocketReaders.FRAME_READER.createInstance();
+		this.outgoingQueue = new LinkedBlockingQueue<>();
+		readerInstance.onFinished(frame -> {
+			httpConnection.getLogger().debug(String.format("Received WebSocket frame: %s (fin: %s)", frame.getOpCode(), frame.isFin()));
+			readerInstance.reset();
+			httpConnection.getServer().getExecutor().submit(() -> handleFrame(frame));
+		});
 	}
 
 	public HttpConnection getHttpConnection() {
@@ -47,14 +66,8 @@ public class WebSocketConnection {
 
 	public void send(WebSocketFrame frame) {
 		if(closed) throw new WebSocketException("Connection is closed");
-		try {
-			for(WebSocketFrame f : frame.split()) {
-				f.write(httpConnection.getSocket().getOutputStream());
-			}
-			httpConnection.getSocket().getOutputStream().flush();
-		}catch(IOException e) {
-			throw new WebSocketException("Failed to send frame", e);
-		}
+		outgoingQueue.offer(frame);
+		httpConnection.startWriting();
 	}
 
 	public void sendText(String message) {
@@ -97,16 +110,28 @@ public class WebSocketConnection {
 		close(1000);
 	}
 
-	public void receive() throws IOException {
-		WebSocketFrame frame;
-		frame = WebSocketFrame.read(httpConnection.getSocket().getInputStream());
-		if(frame == null) {
-			// Mark connection as dead
-			httpConnection.setDead();
-			forceClose();
+	public void readData(ByteBuffer buffer) throws IOException {
+		readerInstance.read(buffer);
+	}
+
+	public void writeData(ByteBuffer buffer) throws IOException {
+		if(currentOutgoingFrame == null && outgoingQueue.isEmpty()) {
 			return;
 		}
 
+		if(currentOutgoingFrame == null) {
+			WebSocketFrame outgoing = outgoingQueue.poll();
+			ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+			outgoing.write(bOut);
+			currentOutgoingFrame = Channels.newChannel(new ByteArrayInputStream(bOut.toByteArray()));
+		}
+
+		if(currentOutgoingFrame.read(buffer) == -1) {
+			currentOutgoingFrame = null;
+		}
+	}
+
+	private void handleFrame(WebSocketFrame frame) {
 		endpoint.onFrameReceived(this, frame);
 
 		if(frame.getOpCode().isControl()) {

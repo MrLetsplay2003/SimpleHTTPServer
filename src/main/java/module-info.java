@@ -31,6 +31,7 @@ module simplehttpserver {
 	exports me.mrletsplay.simplehttpserver.http.cors;
 
 	requires transitive me.mrletsplay.mrcore;
+	requires transitive me.mrletsplay.simplenio;
 	requires transitive org.slf4j;
 
 	requires org.apache.commons.text;

@@ -1,5 +1,7 @@
 package me.mrletsplay.simplehttpserver.http.server;
 
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,7 +13,9 @@ import me.mrletsplay.simplehttpserver.http.compression.HttpCompressionMethod;
 import me.mrletsplay.simplehttpserver.http.document.DefaultDocumentProvider;
 import me.mrletsplay.simplehttpserver.http.document.DocumentProvider;
 import me.mrletsplay.simplehttpserver.http.request.RequestProcessor;
-import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnectionAcceptor;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnectionImpl;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpConnectionManager;
+import me.mrletsplay.simplehttpserver.server.connection.Connection;
 import me.mrletsplay.simplehttpserver.server.impl.AbstractServer;
 
 public class HttpServer extends AbstractServer {
@@ -27,7 +31,7 @@ public class HttpServer extends AbstractServer {
 		super(configuration);
 		this.protocolVersion = HttpProtocolVersions.HTTP1_1;
 		this.compressionMethods = new ArrayList<>();
-		setConnectionAcceptor(new HttpConnectionAcceptor(this));
+		setConnectionManager(new HttpConnectionManager(this));
 		setDocumentProvider(new DefaultDocumentProvider());
 		addCompressionMethod(new DeflateCompression());
 		addCompressionMethod(new GzipCompression());
@@ -47,6 +51,11 @@ public class HttpServer extends AbstractServer {
 				.hostBindAll()
 				.port(port)
 				.create());
+	}
+
+	@Override
+	protected Connection createConnection(SelectionKey selectionKey, SocketChannel socket) {
+		return new HttpConnectionImpl(this,  selectionKey, socket);
 	}
 
 	@Override

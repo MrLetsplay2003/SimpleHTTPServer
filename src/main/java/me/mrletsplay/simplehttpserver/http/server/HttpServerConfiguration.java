@@ -3,7 +3,6 @@ package me.mrletsplay.simplehttpserver.http.server;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import me.mrletsplay.simplehttpserver.http.cors.CorsConfiguration;
 import me.mrletsplay.simplehttpserver.server.impl.AbstractServerConfiguration;
@@ -14,8 +13,8 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 	protected CorsConfiguration defaultCorsConfiguration;
 	protected long readTimeout;
 
-	protected HttpServerConfiguration(String host, int port, Logger logger, boolean debugMode, CorsConfiguration defaultCorsConfiguration, long readTimeout) {
-		super(host, port, logger);
+	protected HttpServerConfiguration(String host, int port, Logger logger, int poolSize, int ioWorkers, boolean debugMode, CorsConfiguration defaultCorsConfiguration, long readTimeout) {
+		super(host, port, logger, poolSize, ioWorkers);
 		this.debugMode = debugMode;
 		this.defaultCorsConfiguration = defaultCorsConfiguration;
 		this.readTimeout = readTimeout;
@@ -59,16 +58,16 @@ public class HttpServerConfiguration extends AbstractServerConfiguration {
 			return this;
 		}
 
+		@Override
 		protected void verify() throws IllegalStateException {
-			if(host == null) throw new IllegalStateException("Host must be set");
-			if(port == 0) throw new IllegalStateException("Port must be set to a nonzero value");
-			if(logger == null) logger = LoggerFactory.getLogger(HttpServer.class);
+			super.verify();
+			if(readTimeout < 0) throw new IllegalStateException("Read timeout must be greater than or equal to 0");
 		}
 
 		@Override
 		public HttpServerConfiguration create() throws IllegalStateException {
 			verify();
-			return new HttpServerConfiguration(host, port, logger, debugMode, defaultCorsConfiguration, readTimeout);
+			return new HttpServerConfiguration(host, port, logger, poolSize, ioWorkers, debugMode, defaultCorsConfiguration, readTimeout);
 		}
 
 	}

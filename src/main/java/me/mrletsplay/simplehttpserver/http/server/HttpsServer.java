@@ -2,21 +2,25 @@ package me.mrletsplay.simplehttpserver.http.server;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.UnknownHostException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
 import java.security.GeneralSecurityException;
 
+import javax.net.ssl.SSLContext;
+
 import me.mrletsplay.mrcore.misc.FriendlyException;
-import me.mrletsplay.simplehttpserver.http.ssl.SSLCertificateSocketFactory;
+import me.mrletsplay.simplehttpserver.http.server.connection.HttpsConnectionImpl;
+import me.mrletsplay.simplehttpserver.http.util.SSLHelper;
+import me.mrletsplay.simplehttpserver.server.connection.Connection;
 
 public class HttpsServer extends HttpServer {
-	
-	private SSLCertificateSocketFactory socketFactory;
+
+	private SSLContext sslContext;
 
 	public HttpsServer(HttpsServerConfiguration configuration) {
 		super(configuration);
 		try {
-			this.socketFactory = new SSLCertificateSocketFactory(configuration.getCertificateFile(), configuration.getCertificateKeyFile(), configuration.getCertificatePassword());
+			this.sslContext = SSLHelper.createSSLContext(configuration.getCertificateFile(), configuration.getCertificateKeyFile(), configuration.getCertificatePassword());
 		} catch (IOException | GeneralSecurityException e) {
 			throw new FriendlyException("Failed to intialize http server", e);
 		}
@@ -41,12 +45,12 @@ public class HttpsServer extends HttpServer {
 				.certificatePassword(certificatePassword)
 				.create());
 	}
-	
+
 	@Override
-	protected ServerSocket createSocket() throws UnknownHostException, IOException {
-		return socketFactory.createServerSocket(getConfiguration().getHost(), getConfiguration().getPort());
+	protected Connection createConnection(SelectionKey selectionKey, SocketChannel socket) {
+		return new HttpsConnectionImpl(this, selectionKey, socket, sslContext);
 	}
-	
+
 	public static HttpsServerConfiguration.Builder newConfigurationBuilder() {
 		return new HttpsServerConfiguration.Builder();
 	}

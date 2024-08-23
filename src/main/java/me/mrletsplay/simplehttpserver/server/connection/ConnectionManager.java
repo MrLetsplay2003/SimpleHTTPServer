@@ -1,15 +1,12 @@
 package me.mrletsplay.simplehttpserver.server.connection;
 
-import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collection;
 
 import me.mrletsplay.simplehttpserver.server.Server;
 import me.mrletsplay.simplehttpserver.server.ServerException;
 
-public interface ConnectionAcceptor {
-
-	public Connection createConnection(Socket socket);
+public interface ConnectionManager {
 
 	public void accept(Connection connection);
 

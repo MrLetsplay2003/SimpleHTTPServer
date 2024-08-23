@@ -2,10 +2,13 @@ package me.mrletsplay.simplehttpserver.server.impl;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -15,65 +18,128 @@ import org.slf4j.Logger;
 import me.mrletsplay.simplehttpserver.server.Server;
 import me.mrletsplay.simplehttpserver.server.ServerException;
 import me.mrletsplay.simplehttpserver.server.connection.Connection;
-import me.mrletsplay.simplehttpserver.server.connection.ConnectionAcceptor;
+import me.mrletsplay.simplehttpserver.server.connection.ConnectionManager;
 
 public abstract class AbstractServer implements Server {
 
 	private AbstractServerConfiguration configuration;
-	private ServerSocket socket;
-	private ConnectionAcceptor acceptor;
+	private ServerSocketChannel socket;
+	private Selector[] selectors;
+	private ConnectionManager manager;
 	private ExecutorService executor;
+	private int i = 0;
 
 	public AbstractServer(AbstractServerConfiguration configuration) {
 		this.configuration = configuration;
 	}
 
-	protected ServerSocket createSocket() throws UnknownHostException, IOException {
-		return new ServerSocket(configuration.getPort(), 50, InetAddress.getByName(configuration.getHost()));
+	protected ServerSocketChannel createSocket() throws UnknownHostException, IOException {
+		ServerSocketChannel socket = ServerSocketChannel.open();
+		socket.bind(new InetSocketAddress(InetAddress.getByName(configuration.getHost()), configuration.getPort()));
+		socket.configureBlocking(false);
+		return socket;
 	}
+
+	protected abstract Connection createConnection(SelectionKey selectionKey, SocketChannel socket);
 
 	@Override
 	public void start() {
 		try {
+			selectors = new Selector[configuration.getIOWorkers()];
+			for(int i = 0; i < configuration.getIOWorkers(); i++) {
+				selectors[i] = Selector.open();
+			}
+
 			socket = createSocket();
-			socket.setSoTimeout(1000);
-			executor = Executors.newCachedThreadPool();
-			executor.execute(() -> {
-				while(!executor.isShutdown()) {
-					try {
-						acceptConnection();
-					}catch(SocketTimeoutException ignored) {
-					}catch(Exception e) {
-						getLogger().error("Error while accepting connection", e);
+			socket.register(selectors[0], SelectionKey.OP_ACCEPT);
+
+			executor = Executors.newFixedThreadPool(configuration.getPoolSize());
+
+			for(Selector selector : selectors) {
+				executor.submit(() -> {
+					while(!executor.isShutdown()) {
+						try {
+							workLoop(selector);
+						}catch(Exception e) {
+							getLogger().error("Error while accepting connection", e);
+						}
 					}
-				}
-			});
+				});
+			}
 		} catch (IOException e) {
 			throw new ServerException("Error while starting server", e);
 		}
 	}
 
-	private void acceptConnection() throws IOException {
-		Socket s = socket.accept();
+	private void workLoop(Selector selector) throws IOException {
+		selector.select(1000);
 		if(executor.isShutdown()) return;
-		Connection con = acceptor.createConnection(s);
-		acceptor.accept(con);
+
+		Set<SelectionKey> selected = selector.selectedKeys();
+		var iterator = selected.iterator();
+		while(iterator.hasNext()) {
+			SelectionKey key = iterator.next();
+
+			if(key.isValid() && key.isAcceptable()) {
+				acceptConnection();
+			}
+
+			if(key.attachment() instanceof Connection) {
+				Connection con = (Connection) key.attachment();
+				if(!con.isSocketAlive()) {
+					con.close();
+					continue;
+				}
+
+				if(key.isValid() && key.isReadable()) {
+					try {
+						con.readData();
+					}catch(IOException e) {
+						getLogger().error("Client read error", e);
+						con.close();
+					}
+				}
+
+				if(key.isValid() && key.isWritable()) {
+					try {
+						con.writeData();
+					}catch(IOException e) {
+						getLogger().error("Client write error", e);
+						con.close();
+					}
+				}
+			}
+
+			iterator.remove();
+		}
+	}
+
+	private void acceptConnection() throws IOException {
+		SocketChannel client = socket.accept();
+		client.configureBlocking(false);
+
+		i = (i + 1) % selectors.length;
+		SelectionKey key = client.register(selectors[i], SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+		key.selector().wakeup();
+		Connection con = createConnection(key, client); // TODO: handle error in createConnection, unregister
+		key.attach(con);
+		manager.accept(con);
 	}
 
 	@Override
 	public boolean isRunning() {
-		return socket != null && !socket.isClosed();
+		return socket != null && socket.isOpen();
 	}
 
 	@Override
-	public void setConnectionAcceptor(ConnectionAcceptor acceptor) throws IllegalStateException {
+	public void setConnectionManager(ConnectionManager acceptor) throws IllegalStateException {
 		if(isRunning()) throw new IllegalStateException("Server is running");
-		this.acceptor = acceptor;
+		this.manager = acceptor;
 	}
 
 	@Override
-	public ConnectionAcceptor getConnectionAcceptor() {
-		return acceptor;
+	public ConnectionManager getConnectionManager() {
+		return manager;
 	}
 
 	/**
@@ -106,12 +172,6 @@ public abstract class AbstractServer implements Server {
 	}
 
 	@Override
-	public void setExecutor(ExecutorService executor) throws IllegalStateException {
-		if(isRunning()) throw new IllegalStateException("Server is running");
-		this.executor = executor;
-	}
-
-	@Override
 	public ExecutorService getExecutor() {
 		return executor;
 	}
@@ -120,7 +180,8 @@ public abstract class AbstractServer implements Server {
 	public void shutdown() {
 		try {
 			executor.shutdown();
-			acceptor.closeAllConnections();
+			for(Selector s : selectors) s.close();
+			manager.closeAllConnections();
 			try {
 				if(!executor.awaitTermination(5L, TimeUnit.SECONDS)) executor.shutdownNow();
 			}catch(InterruptedException e) {
