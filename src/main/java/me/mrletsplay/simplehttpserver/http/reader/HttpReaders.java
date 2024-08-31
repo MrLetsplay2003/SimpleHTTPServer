@@ -107,7 +107,7 @@ public class HttpReaders {
 
 	private static Operation readLine(SimpleRef<String> ref, int limit) {
 		SimpleRef<byte[]> line = SimpleRef.create();
-		return Operations.readUntilBytes(line, END_OF_LINE, limit).thenRun(instance -> {
+		return new ReadLineOperation(line, limit).thenRun(instance -> {
 			byte[] bytes = line.get(instance);
 			ref.set(instance, new String(bytes, 0, bytes.length - 2));
 		});
