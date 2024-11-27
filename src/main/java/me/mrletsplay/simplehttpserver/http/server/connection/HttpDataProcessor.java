@@ -70,7 +70,10 @@ public class HttpDataProcessor {
 
 	public void readData(ByteBuffer buffer) throws IOException {
 		if(connection.getWebsocketConnection() != null) connection.getWebsocketConnection().readData(buffer);
-		readerInstance.read(buffer);
+
+		while(buffer.hasRemaining()) {
+			readerInstance.read(buffer);
+		}
 	}
 
 	public void writeData(ByteBuffer buffer) throws IOException {
@@ -292,7 +295,9 @@ public class HttpDataProcessor {
 	}
 
 	public void close() {
-		if(websocketConnection != null && connection.isSocketAlive()) websocketConnection.sendCloseFrame(CloseFrame.GOING_AWAY, "Server shutting down");
+		if(websocketConnection != null && connection.isSocketAlive() && !websocketConnection.isClosed()) {
+			websocketConnection.sendCloseFrame(CloseFrame.GOING_AWAY, "Server shutting down");
+		}
 	}
 
 	private class RequestAndResponse {

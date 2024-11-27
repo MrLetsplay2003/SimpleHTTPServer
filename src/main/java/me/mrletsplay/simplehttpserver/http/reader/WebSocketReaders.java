@@ -1,5 +1,7 @@
 package me.mrletsplay.simplehttpserver.http.reader;
 
+import java.io.IOException;
+
 import me.mrletsplay.simplehttpserver.http.websocket.frame.BinaryFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.ContinuationFrame;
@@ -29,6 +31,7 @@ public class WebSocketReaders {
 		Ref<Boolean> rsv1Ref = b1.map(b -> (b & 0x40) != 0);
 		Ref<Boolean> rsv2Ref = b1.map(b -> (b & 0x20) != 0);
 		Ref<Boolean> rsv3Ref = b1.map(b -> (b & 0x10) != 0);
+
 		Ref<Integer> rawOpCode = b1.map(b -> b & 0x0F);
 		Ref<WebSocketOpCode> opCode = rawOpCode.map(WebSocketOpCode::getByCode);
 
@@ -45,6 +48,9 @@ public class WebSocketReaders {
 		SimpleRef<Integer> fullPayloadLength = SimpleRef.create();
 		Ref<Integer> payloadLength = b2.map(b -> b & 0x7F);
 
+		reader.expect(instance -> !opCode.get(instance).isControl() || payloadLength.get(instance) < 126)
+			.orElseRun(instance -> { throw new InvalidFrameException("Control frames must have payload length < 126 bytes"); });
+
 		reader.branch(payloadLength.map(l -> l < 126), Operations.run(instance -> fullPayloadLength.set(instance, payloadLength.get(instance))), null);
 		reader.branch(payloadLength.map(l -> l == 126), readNByteLength(fullPayloadLength, 2), null);
 		reader.branch(payloadLength.map(l -> l == 127), readNByteLength(fullPayloadLength, 8), null);
@@ -53,32 +59,36 @@ public class WebSocketReaders {
 		Ref<byte[]> payload = reader.readNBytes(fullPayloadLength);
 
 		reader.setConverter(instance -> {
-			byte[] pl = payload.get(instance);
-			byte[] mk = maskingKey.get(instance);
+			try {
+				byte[] pl = payload.get(instance);
+				byte[] mk = maskingKey.get(instance);
 
-			for(int i = 0; i < pl.length; i++) {
-				pl[i] = (byte) (pl[i] ^ mk[i % 4]);
-			}
+				for(int i = 0; i < pl.length; i++) {
+					pl[i] = (byte) (pl[i] ^ mk[i % 4]);
+				}
 
-			boolean fin = finRef.get(instance);
-			boolean rsv1 = rsv1Ref.get(instance);
-			boolean rsv2 = rsv2Ref.get(instance);
-			boolean rsv3 = rsv3Ref.get(instance);
-			switch(opCode.get(instance)) {
-				case BINARY_FRAME:
-					return new BinaryFrame(fin, rsv1, rsv2, rsv3, pl);
-				case CONNECTION_CLOSE:
-					return new CloseFrame(fin, rsv1, rsv2, rsv3, pl);
-				case CONTINUATION_FRAME:
-					return new ContinuationFrame(fin, rsv1, rsv2, rsv3, pl);
-				case PING:
-					return new PingFrame(fin, rsv1, rsv2, rsv3, pl);
-				case PONG:
-					return new PongFrame(fin, rsv1, rsv2, rsv3, pl);
-				case TEXT_FRAME:
-					return new TextFrame(fin, rsv1, rsv2, rsv3, pl);
-				default:
-					throw new InvalidFrameException("Unsupported opcode: " + opCode);
+				boolean fin = finRef.get(instance);
+				boolean rsv1 = rsv1Ref.get(instance);
+				boolean rsv2 = rsv2Ref.get(instance);
+				boolean rsv3 = rsv3Ref.get(instance);
+				switch(opCode.get(instance)) {
+					case BINARY_FRAME:
+						return new BinaryFrame(fin, rsv1, rsv2, rsv3, pl);
+					case CONNECTION_CLOSE:
+						return new CloseFrame(fin, rsv1, rsv2, rsv3, pl);
+					case CONTINUATION_FRAME:
+						return new ContinuationFrame(fin, rsv1, rsv2, rsv3, pl);
+					case PING:
+						return new PingFrame(fin, rsv1, rsv2, rsv3, pl);
+					case PONG:
+						return new PongFrame(fin, rsv1, rsv2, rsv3, pl);
+					case TEXT_FRAME:
+						return new TextFrame(fin, rsv1, rsv2, rsv3, pl);
+					default:
+						throw new InvalidFrameException("Unsupported opcode: " + opCode);
+				}
+			}catch(InvalidFrameException e) {
+				throw new IOException(e);
 			}
 		});
 

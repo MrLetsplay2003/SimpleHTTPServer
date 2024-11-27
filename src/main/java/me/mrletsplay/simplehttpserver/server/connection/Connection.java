@@ -30,20 +30,24 @@ public interface Connection {
 	}
 
 	public default void startReading() {
+		if(!getSelectionKey().isValid()) return;
 		getSelectionKey().interestOpsOr(SelectionKey.OP_READ);
 		getSelectionKey().selector().wakeup();
 	}
 
 	public default void stopReading() {
+		if(!getSelectionKey().isValid()) return;
 		getSelectionKey().interestOpsAnd(~SelectionKey.OP_READ);
 	}
 
 	public default void startWriting() {
+		if(!getSelectionKey().isValid()) return;
 		getSelectionKey().interestOpsOr(SelectionKey.OP_WRITE);
 		getSelectionKey().selector().wakeup();
 	}
 
 	public default void stopWriting() {
+		if(!getSelectionKey().isValid()) return;
 		getSelectionKey().interestOpsAnd(~SelectionKey.OP_WRITE);
 	}
 

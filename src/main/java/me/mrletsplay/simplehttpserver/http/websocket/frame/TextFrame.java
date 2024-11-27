@@ -1,20 +1,34 @@
 package me.mrletsplay.simplehttpserver.http.websocket.frame;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
 
+import me.mrletsplay.simplehttpserver.http.websocket.WebSocketException;
+
 public class TextFrame extends WebSocketFrame {
-	
+
 	private String text;
-	
+
 	public TextFrame(boolean fin, boolean rsv1, boolean rsv2, boolean rsv3, byte[] payload) {
 		super(fin, rsv1, rsv2, rsv3, WebSocketOpCode.TEXT_FRAME, payload);
-		this.text = new String(payload, StandardCharsets.UTF_8);
 	}
-	
+
+	@Override
+	public void validatePayload() throws WebSocketException {
+		CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
+		try {
+			this.text = decoder.decode(ByteBuffer.wrap(getPayload())).toString();
+		} catch (CharacterCodingException e) {
+			throw new WebSocketException("Invalid UTF-8 in payload", e);
+		}
+	}
+
 	public String getText() {
 		return text;
 	}
-	
+
 	@Override
 	public WebSocketFrame[] split() {
 		if(getPayload().length < MAX_FRAME_SIZE) return new WebSocketFrame[] {this};
@@ -32,5 +46,5 @@ public class TextFrame extends WebSocketFrame {
 		}
 		return frames;
 	}
-	
+
 }

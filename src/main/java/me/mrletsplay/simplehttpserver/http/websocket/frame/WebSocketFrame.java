@@ -1,9 +1,7 @@
 package me.mrletsplay.simplehttpserver.http.websocket.frame;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigInteger;
 
 import me.mrletsplay.simplehttpserver.http.websocket.WebSocketException;
 
@@ -54,13 +52,19 @@ public abstract class WebSocketFrame {
 		return payload;
 	}
 
-	public void appendPayload(byte[] additionalPayload) {
+	public boolean appendPayload(byte[] additionalPayload, boolean fin) {
 		long newLength = (long) payload.length + additionalPayload.length;
 		if(newLength > Integer.MAX_VALUE) throw new WebSocketException("Concatenated frame too big: " + newLength + " > " + Integer.MAX_VALUE);
 		byte[] newPayload = new byte[(int) newLength];
 		System.arraycopy(payload, 0, newPayload, 0, payload.length);
 		System.arraycopy(additionalPayload, 0, newPayload, payload.length, additionalPayload.length);
 		this.payload = newPayload;
+		this.fin = fin;
+		return true;
+	}
+
+	public void validatePayload() throws WebSocketException {
+		// Override in relevant subclasses
 	}
 
 	public void write(OutputStream out) throws IOException {
@@ -81,7 +85,7 @@ public abstract class WebSocketFrame {
 			out.write((payload.length >> 16) & 0xFF);
 			out.write((payload.length >> 8) & 0xFF);
 			out.write(payload.length & 0xFF);
-		}else if(payload.length > 126) {
+		}else if(payload.length >= 126) {
 			out.write(126);
 			out.write((payload.length >> 8) & 0xFF);
 			out.write(payload.length & 0xFF);
@@ -94,74 +98,5 @@ public abstract class WebSocketFrame {
 	}
 
 	public abstract WebSocketFrame[] split();
-
-	public static WebSocketFrame read(InputStream in) throws IOException {
-		int b1 = in.read();
-		if(b1 == -1) return null;
-		boolean fin = (b1 & 0x80) != 0;
-		boolean rsv1 = (b1 & 0x40) != 0;
-		boolean rsv2 = (b1 & 0x20) != 0;
-		boolean rsv3 = (b1 & 0x10) != 0;
-		int rawOpCode = b1 & 0x0F;
-		WebSocketOpCode opCode = WebSocketOpCode.getByCode(rawOpCode);
-		if(opCode == WebSocketOpCode.UNKNOWN) throw new InvalidFrameException("Unknown opcode: " + rawOpCode);
-		if(opCode.isControl() && !fin) throw new InvalidFrameException("Control frames can't be fragmented");
-
-		int b2 = in.read();
-		if(b2 == -1) throw new InvalidFrameException("Unexpected end of stream");
-		boolean mask = (b2 & 0x80) != 0;
-		if(!mask) throw new InvalidFrameException("Client-to-server frames must be masked");
-		int payloadLength = b2 & 0x7F;
-
-		if(payloadLength == 126) {
-			int pL = in.read();
-			int pL2 = in.read();
-			if(pL == -1 || pL2 == -1) throw new InvalidFrameException("Unexpected end of stream");
-
-			payloadLength = (pL << 8) | pL2;
-		}else if(payloadLength == 127) {
-			byte[] pL = new byte[8];
-			int r = in.read(pL);
-			if(r < 8) throw new InvalidFrameException("Unexpected end of stream");
-			// Note: Skipping most significant bit check, because that would result in a number greater than Integer.MAX_VALUE anyway
-			BigInteger p = new BigInteger(1, pL);
-			if(p.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) == 1) throw new InvalidFrameException("Frame too big: " + p.toString() + " > " + Integer.MAX_VALUE);
-			payloadLength = p.intValue();
-		}
-
-		byte[] maskingKey = new byte[4];
-		int mKL = in.read(maskingKey);
-		if(mKL < 4) throw new InvalidFrameException("Unexpected end of stream");
-
-		byte[] payload = new byte[payloadLength];
-
-		int lenRead = 0;
-		int len;
-		while((len = in.read(payload, lenRead, payloadLength - lenRead)) > 0) {
-			lenRead += len;
-		}
-		if(lenRead < payloadLength) throw new InvalidFrameException("Unexpected end of stream");
-
-		for(int i = 0; i < payloadLength; i++) {
-			payload[i] = (byte) (payload[i] ^ maskingKey[i % 4]);
-		}
-
-		switch(opCode) {
-			case BINARY_FRAME:
-				return new BinaryFrame(fin, rsv1, rsv2, rsv3, payload);
-			case CONNECTION_CLOSE:
-				return new CloseFrame(fin, rsv1, rsv2, rsv3, payload);
-			case CONTINUATION_FRAME:
-				return new ContinuationFrame(fin, rsv1, rsv2, rsv3, payload);
-			case PING:
-				return new PingFrame(fin, rsv1, rsv2, rsv3, payload);
-			case PONG:
-				return new PongFrame(fin, rsv1, rsv2, rsv3, payload);
-			case TEXT_FRAME:
-				return new TextFrame(fin, rsv1, rsv2, rsv3, payload);
-			default:
-				throw new InvalidFrameException("Unsupported opcode: " + opCode);
-		}
-	}
 
 }
