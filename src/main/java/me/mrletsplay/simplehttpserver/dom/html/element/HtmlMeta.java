@@ -8,7 +8,7 @@ public class HtmlMeta extends HtmlElement {
 
 	public HtmlMeta() {
 		super("meta");
-		setSelfClosing(true);
+		setNoClosingTag(true);
 	}
 
 	public void setName(Supplier<String> name) {

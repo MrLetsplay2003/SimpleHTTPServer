@@ -6,7 +6,7 @@ public class HtmlBr extends HtmlElement {
 
 	public HtmlBr() {
 		super("br");
-		setSelfClosing(true);
+		setNoClosingTag(true);
 	}
 
 	@Override

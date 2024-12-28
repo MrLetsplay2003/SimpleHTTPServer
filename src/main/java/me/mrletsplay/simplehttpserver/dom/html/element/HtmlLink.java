@@ -8,7 +8,7 @@ public class HtmlLink extends HtmlElement {
 
 	public HtmlLink() {
 		super("link");
-		setSelfClosing(true);
+		setNoClosingTag(true);
 	}
 
 	public void setRel(Supplier<String> rel) {

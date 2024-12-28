@@ -52,6 +52,7 @@ public class WebSocketConnection {
 			processingQueue.offer(frame);
 		});
 
+		// FIXME: don't enqueue an infinite loop for each connection
 		httpConnection.getServer().getExecutor().submit(this::handleFrames);
 	}
 

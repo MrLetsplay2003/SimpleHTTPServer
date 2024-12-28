@@ -9,6 +9,7 @@ public class MimeType {
 		UNKNOWN = of("application/unknown"),
 		TEXT = of("text/plain", "utf-8"),
 		HTML = of("text/html", "utf-8"),
+		XHTML = of("application/xhtml+xml", "utf-8"),
 		CSS = of("text/css", "utf-8"),
 		JAVASCRIPT = of("text/javascript", "utf-8"),
 		JSON = of("application/json", "utf-8"),

@@ -8,7 +8,7 @@ public class HtmlImg extends HtmlElement {
 
 	public HtmlImg() {
 		super("img");
-		setSelfClosing(true);
+		setNoClosingTag(true);
 	}
 
 	public void setSrc(Supplier<String> src) {

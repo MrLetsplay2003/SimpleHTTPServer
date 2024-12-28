@@ -5,6 +5,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import org.apache.commons.text.StringEscapeUtils;
@@ -23,14 +24,32 @@ import me.mrletsplay.simplehttpserver.dom.js.JSScript;
 
 public class HtmlElement {
 
+	// Source: https://html.spec.whatwg.org/multipage/syntax.html#void-elements
+	public static final Set<String> VOID_ELEMENTS = Set.of(
+		"area",
+		"base",
+		"br",
+		"col",
+		"embed",
+		"hr",
+		"img",
+		"input",
+		"link",
+		"meta",
+		"source",
+		"track",
+		"wbr"
+	);
+
 	private HtmlElement parent;
 	private String type;
 	private Supplier<String> text;
 	private Map<String, Supplier<String>> attributes;
 	private List<HtmlElement> children;
-	private boolean selfClosing;
+	private boolean noClosingTag;
 	protected EnumSet<HtmlElementFlag> flags;
 
+	@Deprecated
 	public HtmlElement(String type) {
 		this.type = type;
 		this.attributes = new HashMap<>();
@@ -95,7 +114,7 @@ public class HtmlElement {
 		return attributes;
 	}
 
-	public void appendChild(HtmlElement child) {
+	public void appendChild(HtmlElement child) throws HtmlException {
 		if(child.getParent() != null) child.getParent().removeChild(child);
 		HtmlElement tmpC = this;
 		while(tmpC.getParent() != null) {
@@ -114,12 +133,12 @@ public class HtmlElement {
 		return children;
 	}
 
-	public void setSelfClosing(boolean selfClosing) {
-		this.selfClosing = selfClosing;
+	public void setNoClosingTag(boolean noClosingTag) {
+		this.noClosingTag = noClosingTag;
 	}
 
-	public boolean isSelfClosing() {
-		return selfClosing;
+	public boolean isNoClosingTag() {
+		return noClosingTag;
 	}
 
 	public void setID(Supplier<String> id) {
@@ -174,7 +193,7 @@ public class HtmlElement {
 				copy.appendChild(child.deepCopy());
 			}
 		}
-		copy.selfClosing = selfClosing;
+		copy.noClosingTag = noClosingTag;
 		copy.flags = EnumSet.copyOf(flags);
 	}
 
@@ -186,9 +205,9 @@ public class HtmlElement {
 			String attrV = attr.getValue().get();
 			if(attrV != null) b.append("=\"").append(StringEscapeUtils.escapeHtml4(attrV)).append("\"");
 		}
-		if(isSelfClosing()) {
-			b.append(" />");
-			return b.toString(); // Self closing elements can't have content
+		if(isNoClosingTag()) {
+			b.append(">");
+			return b.toString(); // Elements without closing tag can't have content
 		}
 		b.append(">");
 		String txt;
@@ -256,7 +275,13 @@ public class HtmlElement {
 	}
 
 	public static HtmlElement p() {
-		return new HtmlElement("p");
+		return of("p");
+	}
+
+	public static HtmlElement of(String type) {
+		HtmlElement element = new HtmlElement(type);
+		element.setNoClosingTag(VOID_ELEMENTS.contains(type.toLowerCase()));
+		return element;
 	}
 
 }

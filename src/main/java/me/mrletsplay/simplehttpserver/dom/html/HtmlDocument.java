@@ -29,7 +29,7 @@ public class HtmlDocument implements HttpDocument {
 		this.head = new HtmlElement("head");
 		this.body = new HtmlElement("body");
 		this.title = new HtmlElement("title");
-		title.setText("Webinterface");
+		title.setText("SimpleHTTPServer");
 		this.description = HtmlElement.meta();
 		description.setName("description");
 		description.setContent("Just another HTML5 document!");
@@ -123,8 +123,13 @@ public class HtmlDocument implements HttpDocument {
 	}
 
 	@Override
+	public String toString() {
+		return "<!DOCTYPE html>" + html.toString();
+	}
+
+	@Override
 	public void createContent() {
-		HttpRequestContext.getCurrentContext().getServerHeader().setContent(MimeType.HTML, ("<!DOCTYPE html>" + html.toString()).getBytes(StandardCharsets.UTF_8));
+		HttpRequestContext.getCurrentContext().getServerHeader().setContent(MimeType.HTML, toString().getBytes(StandardCharsets.UTF_8));
 	}
 
 }
