@@ -69,7 +69,9 @@ public class HttpDataProcessor {
 	}
 
 	public void readData(ByteBuffer buffer) throws IOException {
-		if(connection.getWebsocketConnection() != null) connection.getWebsocketConnection().readData(buffer);
+		if(connection.getWebsocketConnection() != null) {
+			connection.getWebsocketConnection().readData(buffer);
+		}
 
 		while(buffer.hasRemaining()) {
 			readerInstance.read(buffer);
@@ -78,7 +80,10 @@ public class HttpDataProcessor {
 
 	public void writeData(ByteBuffer buffer) throws IOException {
 		if(currentResponse == null && responseQueue.isEmpty()) {
-			if(connection.getWebsocketConnection() != null) connection.getWebsocketConnection().writeData(buffer);
+			if(connection.getWebsocketConnection() != null) {
+				connection.getWebsocketConnection().writeData(buffer);
+			}
+
 			return;
 		}
 

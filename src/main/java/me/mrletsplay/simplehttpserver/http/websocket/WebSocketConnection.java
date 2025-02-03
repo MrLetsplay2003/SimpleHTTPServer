@@ -50,10 +50,8 @@ public class WebSocketConnection {
 			httpConnection.getLogger().debug(String.format("Received WebSocket frame: %s (fin: %s)", frame.getOpCode(), frame.isFin()));
 			readerInstance.reset();
 			processingQueue.offer(frame);
+			getHttpConnection().getServer().getExecutor().submit(() -> handleSingleFrame());
 		});
-
-		// FIXME: don't enqueue an infinite loop for each connection
-		httpConnection.getServer().getExecutor().submit(this::handleFrames);
 	}
 
 	public HttpConnection getHttpConnection() {
@@ -166,14 +164,18 @@ public class WebSocketConnection {
 		}
 	}
 
-	private void handleFrames() {
-		while(!isClosed() && httpConnection.isSocketAlive() && !httpConnection.getServer().getExecutor().isShutdown()) {
+	private void handleSingleFrame() {
+		synchronized (processingQueue) {
 			try {
 				WebSocketFrame frame = processingQueue.poll(1, TimeUnit.SECONDS);
-				if(frame == null) continue;
+				if(frame == null) {
+					getHttpConnection().getLogger().warn("Got no frame from queue after calling handleSingleFrame");
+					return;
+				}
+
 				handleFrame(frame);
 			} catch (InterruptedException e) {
-				continue;
+				return;
 			}
 		}
 	}
