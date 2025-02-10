@@ -40,7 +40,8 @@ public class PathMatcher {
 
 		if(parts.length < patternParts.length) return null;
 
-		for(int i = 0; i < patternParts.length; i++) {
+		int i;
+		for(i = 0; i < patternParts.length; i++) {
 			String pp = patternParts[i];
 			String p = parts[i];
 
@@ -48,7 +49,12 @@ public class PathMatcher {
 				if(!pp.contains("}")) throw new IllegalArgumentException("Unclosed path parameter");
 				int paramStart = pp.indexOf('{');
 				int paramEnd = pp.indexOf('}');
-				if(paramEnd < paramStart) throw new IllegalArgumentException("Malformed parameter");
+				if(paramEnd < paramStart
+					|| paramStart != pp.lastIndexOf('{')
+					|| paramEnd != pp.lastIndexOf('}')) {
+					throw new IllegalArgumentException("Malformed parameter");
+				}
+
 				String prefix = pp.substring(0, paramStart);
 				String suffix = pp.substring(paramEnd + 1);
 
@@ -83,6 +89,7 @@ public class PathMatcher {
 
 				if(variable) {
 					p = Arrays.stream(parts).skip(i).collect(Collectors.joining("/"));
+					i = parts.length - 1; // All remaining parts have been handled
 				}
 
 				if(p.length() < (prefix + suffix).length()) return null; // Avoid cases where prefix and suffix overlap
@@ -96,6 +103,8 @@ public class PathMatcher {
 
 			if(!pp.equals(p)) return null;
 		}
+
+		if(i != parts.length) return null; // Some parts have not been matched to the pattern
 
 		return params;
 	}

@@ -56,8 +56,15 @@ public interface EndpointCollection extends HttpDocument {
 					if(!path.equals(endpointPath)) continue;
 				}
 
-				if(!Arrays.stream(m.getParameterTypes()).allMatch(t -> t.equals(String.class))) {
-					throw new EndpointException("Invalid endpoint definition: Endpoints may only have String parameters");
+				boolean hasContext = false;
+				if(m.getParameterCount() > 0 && m.getParameterTypes()[0].equals(HttpRequestContext.class)) {
+					hasContext = true;
+				}
+
+				int paramOffset = hasContext ? 1 : 0;
+
+				if(!Arrays.stream(m.getParameterTypes()).skip(hasContext ? 1 : 0).allMatch(t -> t.equals(String.class))) {
+					throw new EndpointException("Invalid endpoint definition: Endpoints may only have String parameters, with an optional first parameter of type HttpRequestContext");
 				}
 
 				RequestParameter[] requestParams = EndpointUtil.getRequestParameters(m);
@@ -69,7 +76,11 @@ public interface EndpointCollection extends HttpDocument {
 					throw new EndpointException("Invalid endpoint definition: Endpoint has parameters but no path pattern");
 				}
 
-				Object[] args = new Object[requestParams.length];
+				Object[] args = new Object[requestParams.length + paramOffset];
+				if(hasContext) {
+					args[0] = ctx;
+				}
+
 				for(int i = 0; i < requestParams.length; i++) {
 					@SuppressWarnings("null")
 					String value = params.get(requestParams[i].value());
@@ -77,7 +88,7 @@ public interface EndpointCollection extends HttpDocument {
 						throw new EndpointException("Invalid endpoint definition: Endpoint parameter doesn't exist in path pattern");
 					}
 
-					args[i] = value;
+					args[i + paramOffset] = value;
 				}
 
 				try {

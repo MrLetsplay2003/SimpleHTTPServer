@@ -4,6 +4,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Arrays;
 
+import me.mrletsplay.simplehttpserver.http.request.HttpRequestContext;
+
 public class EndpointUtil {
 
 	private EndpointUtil() {}
@@ -41,13 +43,17 @@ public class EndpointUtil {
 	 * @throws SecurityException If the exception occurs during reflection
 	 */
 	public static RequestParameter[] getRequestParameters(Method method) throws SecurityException {
-		RequestParameter[] requestParams = new RequestParameter[method.getParameterCount()];
+		boolean hasContext = method.getParameterCount() > 0 && method.getParameterTypes()[0].equals(HttpRequestContext.class);
+		int paramOffset = hasContext ? -1 : 0;
+		RequestParameter[] requestParams = new RequestParameter[method.getParameterCount() + paramOffset];
 
 		while(true) {
 			Parameter[] params = method.getParameters();
 			for(int i = 0; i < params.length; i++) {
-				if(requestParams[i] != null) continue;
-				requestParams[i] = params[i].getAnnotation(RequestParameter.class);
+				if(i < -paramOffset
+					|| requestParams[i + paramOffset] != null
+					|| params[i].getType().equals(HttpRequestContext.class)) continue;
+				requestParams[i + paramOffset] = params[i].getAnnotation(RequestParameter.class);
 			}
 
 			if(!Arrays.asList(requestParams).contains(null)) return requestParams;
