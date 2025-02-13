@@ -60,10 +60,12 @@ public abstract class AbstractServer implements Server {
 					while(!executor.isShutdown()) {
 						try {
 							workLoop(selector);
-						}catch(Exception e) {
-							getLogger().error("Error while accepting connection", e);
+						}catch(Throwable e) {
+							getLogger().error("Error while processing connection", e);
 						}
 					}
+
+					getLogger().info("Work loop shutting down");
 				});
 			}
 		} catch (IOException e) {
@@ -87,24 +89,27 @@ public abstract class AbstractServer implements Server {
 			if(key.attachment() instanceof Connection) {
 				Connection con = (Connection) key.attachment();
 				if(!con.isSocketAlive()) {
+					getLogger().debug("Socket for client " + con.getSocket().getRemoteAddress() + " died");
 					con.close();
 					continue;
 				}
 
 				if(key.isValid() && key.isReadable()) {
 					try {
+						getLogger().trace("Reading data from client " + con.getSocket().getRemoteAddress());
 						con.readData();
 					}catch(IOException e) {
-						getLogger().error("Client read error", e);
+						getLogger().debug("Client read error, dropping connection", e);
 						con.close();
 					}
 				}
 
 				if(key.isValid() && key.isWritable()) {
 					try {
+						getLogger().trace("Writing data to client " + con.getSocket().getRemoteAddress());
 						con.writeData();
 					}catch(IOException e) {
-						getLogger().error("Client write error", e);
+						getLogger().debug("Client write error, dropping connection", e);
 						con.close();
 					}
 				}
@@ -115,15 +120,17 @@ public abstract class AbstractServer implements Server {
 	}
 
 	private void acceptConnection() throws IOException {
+		getLogger().debug("Accepting connection");
 		SocketChannel client = socket.accept();
+		getLogger().debug("Connection from " + client.getRemoteAddress());
 		client.configureBlocking(false);
 
 		i = (i + 1) % selectors.length;
 		SelectionKey key = client.register(selectors[i], SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-		key.selector().wakeup();
 		Connection con = createConnection(key, client); // TODO: handle error in createConnection, unregister
 		key.attach(con);
 		manager.accept(con);
+		key.selector().wakeup();
 	}
 
 	@Override

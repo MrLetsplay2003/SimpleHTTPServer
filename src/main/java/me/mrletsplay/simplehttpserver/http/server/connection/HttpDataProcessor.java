@@ -95,9 +95,11 @@ public class HttpDataProcessor {
 
 			RequestAndResponse requestAndResponse = responseQueue.poll();
 			HttpServerHeader response = requestAndResponse.response;
-			ByteArrayOutputStream bOut = new ByteArrayOutputStream(); // TODO: improve
+
+			// FIXME: this approach has horrible performance when it comes to partial content of large files
+			ByteArrayOutputStream bOut = new ByteArrayOutputStream();
 			bOut.write(response.getHeaderBytes());
-			bOut.write(response.getContent().readAllBytes());
+			bOut.write(response.getContent().readNBytes((int) response.getContentLength()));
 			currentResponse = Channels.newChannel(new ByteArrayInputStream(bOut.toByteArray()));
 		}
 
@@ -261,8 +263,20 @@ public class HttpDataProcessor {
 						sh.setContent(MimeType.HTML, "<h1>400 Bad Request</h1>".getBytes(StandardCharsets.UTF_8));
 						return true;
 					}
+
+					long skipped;
+					try {
+						skipped = sh.getContent().skip(sh.getContentOffset());
+					} catch (IOException e) {
+						throw new FriendlyException("Range skip");
+					}
+
+					if(skipped < sh.getContentOffset()) {
+						connection.getLogger().warn("Could not skip to content offset (skipped " + skipped + " of " + sh.getContentOffset() + " bytes)");
+					}
+
 					sh.setStatusCode(HttpStatusCodes.PARTIAL_CONTENT_206);
-					sh.getFields().set("Content-Range", "bytes " + sh.getContentOffset() + "-" + (sh.getContentOffset() + sh.getContentLength() - 1) + "/" + sh.getTotalContentLength());
+					sh.getFields().set("Content-Range", "bytes " + skipped + "-" + (skipped + sh.getContentLength() - 1) + "/" + sh.getTotalContentLength());
 				}catch(NumberFormatException | FriendlyException e) {
 					sh.setStatusCode(HttpStatusCodes.REQUESTED_RANGE_NOT_SATISFIABLE_416);
 					sh.setContent(MimeType.HTML, "<h1>416 Requested Range Not Satisfiable</h1>".getBytes(StandardCharsets.UTF_8));
