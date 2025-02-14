@@ -47,6 +47,7 @@ public class WebSocketReadersTest {
 		assertTrue(assertDoesNotThrow(() -> reader.read(ByteBuffer.wrap(bytes))), "Reader did not finish reading");
 
 		WebSocketFrame frame = reader.get();
+		frame.validatePayload();
 		assertEquals(WebSocketOpCode.TEXT_FRAME, frame.getOpCode());
 		assertEquals("testtest", ((TextFrame) frame).getText());
 	}
