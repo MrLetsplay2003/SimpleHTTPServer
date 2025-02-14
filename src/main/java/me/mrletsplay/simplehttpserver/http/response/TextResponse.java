@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets;
 
 import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
-public class TextResponse implements HttpResponse {
+public class TextResponse extends FixedHttpResponse {
 
 	private String text;
 
@@ -13,7 +13,7 @@ public class TextResponse implements HttpResponse {
 	}
 
 	@Override
-	public byte[] getContent() {
+	public byte[] getContentBytes() {
 		return text.getBytes(StandardCharsets.UTF_8);
 	}
 

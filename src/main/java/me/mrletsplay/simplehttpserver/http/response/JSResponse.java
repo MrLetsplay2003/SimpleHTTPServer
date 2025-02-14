@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets;
 import me.mrletsplay.simplehttpserver.dom.js.JSScript;
 import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
-public class JSResponse implements HttpResponse {
+public class JSResponse extends FixedHttpResponse {
 
 	private JSScript js;
 
@@ -14,7 +14,7 @@ public class JSResponse implements HttpResponse {
 	}
 
 	@Override
-	public byte[] getContent() {
+	public byte[] getContentBytes() {
 		return js.toString().getBytes(StandardCharsets.UTF_8);
 	}
 

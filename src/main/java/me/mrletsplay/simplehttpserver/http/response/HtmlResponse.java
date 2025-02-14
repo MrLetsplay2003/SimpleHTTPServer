@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets;
 import me.mrletsplay.simplehttpserver.dom.html.HtmlDocument;
 import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
-public class HtmlResponse implements HttpResponse {
+public class HtmlResponse extends FixedHttpResponse {
 
 	private HtmlDocument html;
 
@@ -14,7 +14,7 @@ public class HtmlResponse implements HttpResponse {
 	}
 
 	@Override
-	public byte[] getContent() {
+	public byte[] getContentBytes() {
 		return html.toString().getBytes(StandardCharsets.UTF_8);
 	}
 

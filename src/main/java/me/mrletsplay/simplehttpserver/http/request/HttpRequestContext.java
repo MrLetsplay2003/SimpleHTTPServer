@@ -106,7 +106,7 @@ public class HttpRequestContext {
 
 	public void respond(HttpStatusCode statusCode, HttpResponse response) {
 		serverHeader.setStatusCode(statusCode);
-		serverHeader.setContent(response.getContentType(), response.getContent());
+		serverHeader.setContent(response.getContentType(), response.getContent(), response.getContentLength());
 	}
 
 	public static HttpRequestContext getCurrentContext() throws IllegalStateException {

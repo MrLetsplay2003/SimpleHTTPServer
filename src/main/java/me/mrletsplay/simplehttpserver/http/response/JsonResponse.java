@@ -6,7 +6,7 @@ import me.mrletsplay.mrcore.json.JSONArray;
 import me.mrletsplay.mrcore.json.JSONObject;
 import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
-public class JsonResponse implements HttpResponse {
+public class JsonResponse extends FixedHttpResponse {
 
 	public static final JsonResponse
 		EMPTY_OBJECT = new JsonResponse(new JSONObject()),
@@ -23,7 +23,7 @@ public class JsonResponse implements HttpResponse {
 	}
 
 	@Override
-	public byte[] getContent() {
+	public byte[] getContentBytes() {
 		return json.getBytes(StandardCharsets.UTF_8);
 	}
 

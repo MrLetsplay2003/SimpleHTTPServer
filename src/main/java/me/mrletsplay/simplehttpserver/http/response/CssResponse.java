@@ -6,7 +6,7 @@ import javax.swing.text.html.StyleSheet;
 
 import me.mrletsplay.simplehttpserver.http.util.MimeType;
 
-public class CssResponse implements HttpResponse {
+public class CssResponse extends FixedHttpResponse {
 
 	private StyleSheet css;
 
@@ -15,7 +15,7 @@ public class CssResponse implements HttpResponse {
 	}
 
 	@Override
-	public byte[] getContent() {
+	public byte[] getContentBytes() {
 		return css.toString().getBytes(StandardCharsets.UTF_8);
 	}
 
