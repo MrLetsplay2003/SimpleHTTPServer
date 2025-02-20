@@ -1,17 +1,14 @@
 package me.mrletsplay.simplehttpserver.http.server.connection;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -33,6 +30,8 @@ import me.mrletsplay.simplehttpserver.http.request.RequestProcessor;
 import me.mrletsplay.simplehttpserver.http.util.MimeType;
 import me.mrletsplay.simplehttpserver.http.websocket.WebSocketConnection;
 import me.mrletsplay.simplehttpserver.http.websocket.frame.CloseFrame;
+import me.mrletsplay.simplehttpserver.util.BufferUtil;
+import me.mrletsplay.simplehttpserver.util.RWBuffer;
 import me.mrletsplay.simplenio.reader.ReaderInstance;
 
 public class HttpDataProcessor {
@@ -45,7 +44,7 @@ public class HttpDataProcessor {
 
 	private ReaderInstance<HttpClientHeader> readerInstance;
 
-	private ReadableByteChannel currentResponse;
+	private RequestAndResponse currentResponse;
 
 	public HttpDataProcessor(HttpConnection connection) {
 		this.connection = connection;
@@ -94,17 +93,25 @@ public class HttpDataProcessor {
 			}
 
 			RequestAndResponse requestAndResponse = responseQueue.poll();
-			HttpServerHeader response = requestAndResponse.response;
-
-			// FIXME: this approach has horrible performance when it comes to partial content of large files
-			ByteArrayOutputStream bOut = new ByteArrayOutputStream();
-			bOut.write(response.getHeaderBytes());
-			bOut.write(response.getContent().readNBytes((int) response.getContentLength()));
-			currentResponse = Channels.newChannel(new ByteArrayInputStream(bOut.toByteArray()));
+			requestAndResponse.startProcessing();
+			currentResponse = requestAndResponse;
 		}
 
-		if(currentResponse.read(buffer) == -1) {
-			currentResponse = null;
+		synchronized (currentResponse) {
+			BufferUtil.copyAvailable(currentResponse.buffer.read(), buffer);
+
+			if(currentResponse.buffer.remaining() < buffer.capacity() / 2 && !currentResponse.done) {
+				currentResponse.notifyAll();
+			}
+
+			if(currentResponse.buffer.remaining() == 0) {
+				if(currentResponse.done) {
+					currentResponse.stopProcessing();
+					currentResponse = null;
+				}else {
+					connection.stopWriting();
+				}
+			}
 		}
 	}
 
@@ -317,15 +324,107 @@ public class HttpDataProcessor {
 		if(websocketConnection != null && connection.isSocketAlive() && !websocketConnection.isClosed()) {
 			websocketConnection.sendCloseFrame(CloseFrame.GOING_AWAY, "Server shutting down");
 		}
+
+		if(currentResponse != null) {
+			currentResponse.stopProcessing();
+			currentResponse = null;
+		}
 	}
 
 	private class RequestAndResponse {
 
+		private static final int BUFFER_SIZE = 16384; // TODO: Magic value
+		private static final int CONTENT_BUFFER_SIZE = 1024; // TODO: Magic value
+
 		private HttpClientHeader request;
 		private HttpServerHeader response;
 
+		private Future<?> processingFuture;
+		private RWBuffer buffer;
+		private boolean done;
+
 		public RequestAndResponse(HttpClientHeader request) {
 			this.request = request;
+		}
+
+		public void startProcessing() {
+			if(processingFuture != null) return;
+			done = false;
+
+			buffer = RWBuffer.readableBuffer(BUFFER_SIZE);
+
+			// TODO: only process when needed, don't stay on executor when waiting for reading to be done
+			// -> increase buffer size and run processing on executor when there's too little data
+			processingFuture = connection.getServer().getExecutor().submit(() -> {
+				try {
+					byte[] headerBytes = response.getHeaderBytes();
+					int pos = 0;
+					while(pos < headerBytes.length) {
+						if(Thread.interrupted()) return;
+						synchronized (this) {
+							buffer.flip();
+
+							if(buffer.remaining() > 0) {
+								int len = Math.min(buffer.remaining(), headerBytes.length - pos);
+								buffer.write().put(headerBytes, pos, len);
+								pos += len;
+								buffer.flip();
+								connection.startWriting();
+							}else {
+								buffer.flip();
+								connection.startWriting();
+								wait(1000);
+							}
+						}
+					}
+
+					try(InputStream content = response.getContent()) {
+						byte[] buf = new byte[CONTENT_BUFFER_SIZE];
+						int len;
+
+						while((len = content.read(buf)) != -1) {
+							if(Thread.interrupted()) return;
+
+							boolean spaceRemaining;
+							do {
+								synchronized (this) {
+									buffer.flip();
+									spaceRemaining = buffer.remaining() >= len;
+									buffer.flip();
+								}
+
+								if(!spaceRemaining) {
+									synchronized (this) {
+										connection.startWriting();
+										wait(1000);
+									}
+								}
+							}while(!spaceRemaining);
+
+							synchronized (this) {
+								buffer.flip();
+								buffer.write().put(buf, 0, len);
+								buffer.flip();
+								connection.startWriting();
+							}
+						}
+					}
+
+				} catch(InterruptedException e) {
+					return;
+				} catch (IOException e) {
+					connection.getLogger().debug("Exception when processing response", e);
+				} finally {
+					done = true;
+				}
+			});
+		}
+
+		public void stopProcessing() {
+			if(processingFuture == null) return;
+			processingFuture.cancel(true);
+			processingFuture = null;
+			buffer = null;
 		}
 
 	}

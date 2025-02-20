@@ -23,7 +23,11 @@ public class FileResponse implements HttpResponse {
 
 	@Override
 	public InputStream getContent() {
-		return null;
+		try {
+			return Files.newInputStream(filePath);
+		} catch (IOException e) {
+			return null;
+		}
 	}
 
 	@Override
