@@ -1,7 +1,9 @@
 package me.mrletsplay.simplehttpserver.http.server.connection;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -101,7 +103,7 @@ public class HttpDataProcessor {
 			BufferUtil.copyAvailable(currentResponse.buffer.read(), buffer);
 
 			if(currentResponse.buffer.remaining() < buffer.capacity() / 2 && !currentResponse.done) {
-				currentResponse.notifyAll();
+				currentResponse.doProcessing();
 			}
 
 			if(currentResponse.buffer.remaining() == 0) {
@@ -333,12 +335,13 @@ public class HttpDataProcessor {
 
 	private class RequestAndResponse {
 
-		private static final int BUFFER_SIZE = 16384; // TODO: Magic value
+		private static final int BUFFER_SIZE = 64 * 1024; // TODO: Magic value
 		private static final int CONTENT_BUFFER_SIZE = 1024; // TODO: Magic value
 
 		private HttpClientHeader request;
 		private HttpServerHeader response;
 
+		private InputStream contentInputStream;
 		private Future<?> processingFuture;
 		private RWBuffer buffer;
 		private boolean done;
@@ -347,80 +350,80 @@ public class HttpDataProcessor {
 			this.request = request;
 		}
 
-		public void startProcessing() {
+		public synchronized void doProcessing() {
+			connection.getLogger().trace("Processing requested");
 			if(processingFuture != null) return;
-			done = false;
 
-			buffer = RWBuffer.readableBuffer(BUFFER_SIZE);
-
-			// TODO: only process when needed, don't stay on executor when waiting for reading to be done
-			// -> increase buffer size and run processing on executor when there's too little data
+			connection.getLogger().trace("Processing started");
 			processingFuture = connection.getServer().getExecutor().submit(() -> {
 				try {
-					byte[] headerBytes = response.getHeaderBytes();
-					int pos = 0;
-					while(pos < headerBytes.length) {
-						if(Thread.interrupted()) return;
-						synchronized (this) {
+					byte[] buf = new byte[CONTENT_BUFFER_SIZE];
+					while(true) {
+						if(Thread.interrupted()) {
+							processingFuture = null;
+							connection.getLogger().trace("Processing stopped: Interrupted");
+							return;
+						}
+
+						synchronized(this) {
+							buffer.flip();
+							int spaceRemaining = buffer.remaining();
 							buffer.flip();
 
-							if(buffer.remaining() > 0) {
-								int len = Math.min(buffer.remaining(), headerBytes.length - pos);
-								buffer.write().put(headerBytes, pos, len);
-								pos += len;
-								buffer.flip();
+							if(spaceRemaining < CONTENT_BUFFER_SIZE) {
+								processingFuture = null;
 								connection.startWriting();
-							}else {
-								buffer.flip();
-								connection.startWriting();
-								wait(1000);
+								connection.getLogger().trace("Processing stopped: No space");
+								return;
 							}
 						}
-					}
 
-					try(InputStream content = response.getContent()) {
-						byte[] buf = new byte[CONTENT_BUFFER_SIZE];
-						int len;
+						int len = contentInputStream.read(buf);
 
-						while((len = content.read(buf)) != -1) {
-							if(Thread.interrupted()) return;
-
-							boolean spaceRemaining;
-							do {
-								synchronized (this) {
-									buffer.flip();
-									spaceRemaining = buffer.remaining() >= len;
-									buffer.flip();
-								}
-
-								if(!spaceRemaining) {
-									synchronized (this) {
-										connection.startWriting();
-										wait(1000);
-									}
-								}
-							}while(!spaceRemaining);
-
-							synchronized (this) {
-								buffer.flip();
-								buffer.write().put(buf, 0, len);
-								buffer.flip();
-								connection.startWriting();
+						synchronized (this) {
+							if(len == -1) {
+								done = true;
+								processingFuture = null;
+								contentInputStream.close();
+								connection.getLogger().trace("Processing stopped: EOF");
+								return;
 							}
+
+//							buffer.flip();
+//							boolean spaceRemaining = buffer.remaining() >= len;
+//							buffer.flip();
+//
+//							if(!spaceRemaining) {
+//								processingFuture = null;
+//								connection.startWriting();
+//								System.out.println("PROCESSING STOPPED: OOB");
+//								return;
+//							}
+
+							buffer.flip();
+							buffer.write().put(buf, 0, len);
+							buffer.flip();
+							connection.startWriting();
 						}
 					}
-
-				} catch(InterruptedException e) {
-					return;
 				} catch (IOException e) {
 					connection.getLogger().debug("Exception when processing response", e);
-				} finally {
-					done = true;
 				}
 			});
 		}
 
-		public void stopProcessing() {
+		public synchronized void startProcessing() {
+			done = false;
+			buffer = RWBuffer.readableBuffer(BUFFER_SIZE);
+
+			ByteArrayInputStream bIn = new ByteArrayInputStream(response.getHeaderBytes());
+			contentInputStream = new SequenceInputStream(bIn, response.getContent());
+
+			// TODO: only process when needed, don't stay on executor when waiting for reading to be done
+			// -> increase buffer size and run processing on executor when there's too little data
+		}
+
+		public synchronized void stopProcessing() {
 			if(processingFuture == null) return;
 			processingFuture.cancel(true);
 			processingFuture = null;
