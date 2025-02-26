@@ -56,8 +56,8 @@ public class HttpDataProcessor {
 			connection.getLogger().debug(String.format("Received HTTP request: %s %s %s", request.getMethod(), request.getPath(), request.getProtocolVersion()));
 			readerInstance.reset();
 			RequestAndResponse requestAndResponse = new RequestAndResponse(request);
-			connection.getServer().getExecutor().submit(() -> processRequest(requestAndResponse));
 			responseQueue.offer(requestAndResponse);
+			connection.getServer().getExecutor().submit(() -> processRequest(requestAndResponse));
 		});
 	}
 
@@ -80,15 +80,26 @@ public class HttpDataProcessor {
 	}
 
 	public void writeData(ByteBuffer buffer) throws IOException {
-		if(currentResponse == null && responseQueue.isEmpty()) {
+		boolean currentResponseDone = currentResponse == null || (currentResponse.buffer.remaining() == 0 && currentResponse.done);
+
+		if(currentResponseDone && responseQueue.isEmpty()) {
 			if(connection.getWebsocketConnection() != null) {
 				connection.getWebsocketConnection().writeData(buffer);
 			}
 
 			return;
-		}
+		}else if(currentResponseDone) {
+			if(currentResponse != null) {
+				currentResponse.stopProcessing();
+				boolean close = currentResponse.request.getFields().getFirst("Connection").equals("close");
+				currentResponse = null;
 
-		if(currentResponse == null) {
+				if(close) {
+					close();
+					return;
+				}
+			}
+
 			if(responseQueue.peek().response == null) {
 				// Next response is not yet ready
 				return;
@@ -102,15 +113,13 @@ public class HttpDataProcessor {
 		synchronized (currentResponse) {
 			BufferUtil.copyAvailable(currentResponse.buffer.read(), buffer);
 
-			if(currentResponse.buffer.remaining() < buffer.capacity() / 2 && !currentResponse.done) {
-				currentResponse.doProcessing();
-			}
+			if(!currentResponse.done) {
+				if(currentResponse.buffer.remaining() < currentResponse.buffer.capacity() / 2) {
+					currentResponse.doProcessing();
+				}
 
-			if(currentResponse.buffer.remaining() == 0) {
-				if(currentResponse.done) {
-					currentResponse.stopProcessing();
-					currentResponse = null;
-				}else {
+				if(currentResponse.buffer.remaining() == 0) {
+					// Wait for new data to be processed
 					connection.stopWriting();
 				}
 			}
@@ -172,8 +181,6 @@ public class HttpDataProcessor {
 		requestAndResponse.response = sh;
 		connection.getLogger().debug(String.format("Finished processing request: %s %s %s", request.getMethod(), request.getPath(), request.getProtocolVersion()));
 		connection.startWriting();
-
-		// TODO: Respect connection (keep-alive/close) header
 	}
 
 	private HttpServerHeader createResponseFromException(HttpResponseException exception) {
@@ -342,6 +349,7 @@ public class HttpDataProcessor {
 		private HttpServerHeader response;
 
 		private InputStream contentInputStream;
+		private byte[] contentBuffer;
 		private Future<?> processingFuture;
 		private RWBuffer buffer;
 		private boolean done;
@@ -350,71 +358,65 @@ public class HttpDataProcessor {
 			this.request = request;
 		}
 
-		public synchronized void doProcessing() {
-			connection.getLogger().trace("Processing requested");
-			if(processingFuture != null) return;
-
-			connection.getLogger().trace("Processing started");
-			processingFuture = connection.getServer().getExecutor().submit(() -> {
-				try {
-					byte[] buf = new byte[CONTENT_BUFFER_SIZE];
-					while(true) {
+		private void doProcessing0() {
+			try {
+				while(true) {
+					synchronized(this) {
 						if(Thread.interrupted()) {
 							processingFuture = null;
 							connection.getLogger().trace("Processing stopped: Interrupted");
 							return;
 						}
 
-						synchronized(this) {
-							buffer.flip();
-							int spaceRemaining = buffer.remaining();
-							buffer.flip();
+						buffer.flip();
+						int spaceRemaining = buffer.remaining();
+						buffer.flip();
 
-							if(spaceRemaining < CONTENT_BUFFER_SIZE) {
-								processingFuture = null;
-								connection.startWriting();
-								connection.getLogger().trace("Processing stopped: No space");
-								return;
-							}
-						}
-
-						int len = contentInputStream.read(buf);
-
-						synchronized (this) {
-							if(len == -1) {
-								done = true;
-								processingFuture = null;
-								contentInputStream.close();
-								connection.getLogger().trace("Processing stopped: EOF");
-								return;
-							}
-
-//							buffer.flip();
-//							boolean spaceRemaining = buffer.remaining() >= len;
-//							buffer.flip();
-//
-//							if(!spaceRemaining) {
-//								processingFuture = null;
-//								connection.startWriting();
-//								System.out.println("PROCESSING STOPPED: OOB");
-//								return;
-//							}
-
-							buffer.flip();
-							buffer.write().put(buf, 0, len);
-							buffer.flip();
+						if(spaceRemaining < CONTENT_BUFFER_SIZE) {
+							processingFuture = null;
 							connection.startWriting();
+							connection.getLogger().trace("Processing stopped: No space");
+							return;
 						}
 					}
-				} catch (IOException e) {
-					connection.getLogger().debug("Exception when processing response", e);
+
+					int len = contentInputStream.read(contentBuffer);
+
+					synchronized (this) {
+						if(len == -1) {
+							done = true;
+							processingFuture = null;
+							contentInputStream.close();
+							connection.getLogger().trace("Processing stopped: EOF");
+							return;
+						}
+
+						buffer.flip();
+						buffer.write().put(contentBuffer, 0, len);
+						buffer.flip();
+						connection.startWriting();
+					}
 				}
-			});
+			} catch (IOException e) {
+				connection.getLogger().debug("Exception when processing response", e);
+			}
+		}
+
+		public synchronized void doProcessing() {
+			connection.getLogger().trace("Processing requested for " + request.getPath());
+			if(processingFuture != null) {
+				connection.getLogger().trace("Processing already running");
+				return;
+			}
+
+			connection.getLogger().trace("Processing started");
+			processingFuture = connection.getServer().getExecutor().submit(this::doProcessing0);
 		}
 
 		public synchronized void startProcessing() {
 			done = false;
 			buffer = RWBuffer.readableBuffer(BUFFER_SIZE);
+			contentBuffer = new byte[CONTENT_BUFFER_SIZE];
 
 			ByteArrayInputStream bIn = new ByteArrayInputStream(response.getHeaderBytes());
 			contentInputStream = new SequenceInputStream(bIn, response.getContent());
@@ -427,7 +429,11 @@ public class HttpDataProcessor {
 			if(processingFuture == null) return;
 			processingFuture.cancel(true);
 			processingFuture = null;
-			buffer = null;
+		}
+
+		@Override
+		public String toString() {
+			return request.getPath().toString();
 		}
 
 	}
