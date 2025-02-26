@@ -91,7 +91,8 @@ public class HttpDataProcessor {
 		}else if(currentResponseDone) {
 			if(currentResponse != null) {
 				currentResponse.stopProcessing();
-				boolean close = currentResponse.request.getFields().getFirst("Connection").equals("close");
+				boolean close = "close".equals(currentResponse.request.getFields().getFirst("Connection"));
+				// FIXME: send response header
 				currentResponse = null;
 
 				if(close) {
