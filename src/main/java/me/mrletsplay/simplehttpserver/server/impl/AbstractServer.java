@@ -3,6 +3,7 @@ package me.mrletsplay.simplehttpserver.server.impl;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.StandardSocketOptions;
 import java.net.UnknownHostException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -35,6 +36,7 @@ public abstract class AbstractServer implements Server {
 
 	protected ServerSocketChannel createSocket() throws UnknownHostException, IOException {
 		ServerSocketChannel socket = ServerSocketChannel.open();
+		socket.setOption(StandardSocketOptions.SO_REUSEPORT, true);
 		socket.bind(new InetSocketAddress(InetAddress.getByName(configuration.getHost()), configuration.getPort()));
 		socket.configureBlocking(false);
 		return socket;

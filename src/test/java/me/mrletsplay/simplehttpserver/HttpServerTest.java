@@ -8,8 +8,6 @@ import java.io.IOException;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import me.mrletsplay.mrcore.http.HttpRequest;
@@ -24,7 +22,6 @@ public class HttpServerTest {
 
 	private static HttpServer server;
 
-	@BeforeAll
 	public static void startServer() {
 		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "TRACE");
 
@@ -47,20 +44,23 @@ public class HttpServerTest {
 		server.start();
 	}
 
-	@AfterAll
 	public static void stopServer() {
 		server.shutdown();
 	}
 
 	@Test
 	public void testDocumentPaths() {
+		startServer();
 		assertEquals("Hello World!", HttpRequest.createGet("http://127.0.0.1:12345/test").execute().asString());
 		assertEquals("one", HttpRequest.createGet("http://127.0.0.1:12345/pattern/one").execute().asString());
 		assertEquals("two", HttpRequest.createGet("http://127.0.0.1:12345/pattern/two").execute().asString());
+		stopServer();
 	}
 
 	@Test
 	public void testCloseAfterWrite() throws IOException {
+		startServer();
+
 		try(Socket socket = new Socket("127.0.0.1", 12345)) {
 			socket.getOutputStream().write((
 				"GET /test HTTP/1.1\r\n"
@@ -76,10 +76,14 @@ public class HttpServerTest {
 			byte[] response = socket.getInputStream().readAllBytes();
 			assertTrue(new String(response, StandardCharsets.UTF_8).contains("Hello World!"), "Response must contain a body");
 		}
+
+		stopServer();
 	}
 
 	@Test
 	public void testPipelinedRequest() throws IOException {
+		startServer();
+
 		try(Socket socket = new Socket("127.0.0.1", 12345)) {
 			socket.getOutputStream().write((
 				"GET /test HTTP/1.1\r\n"
@@ -100,10 +104,14 @@ public class HttpServerTest {
 			assertTrue(new String(response, StandardCharsets.UTF_8).contains("Hello World!"), "First response must be present");
 			assertTrue(new String(response, StandardCharsets.UTF_8).contains("foobar123"), "Second response must be present");
 		}
+
+		stopServer();
 	}
 
 	@Test
 	public void testPipelinedClose() throws IOException {
+		startServer();
+
 		try(Socket socket = new Socket("127.0.0.1", 12345)) {
 			socket.getOutputStream().write((
 				"GET /test HTTP/1.1\r\n"
@@ -124,6 +132,8 @@ public class HttpServerTest {
 			assertTrue(new String(response, StandardCharsets.UTF_8).contains("Hello World!"), "First response must be present");
 			assertFalse(new String(response, StandardCharsets.UTF_8).contains("foobar123"), "Second response should be omitted");
 		}
+
+		stopServer();
 	}
 
 }
