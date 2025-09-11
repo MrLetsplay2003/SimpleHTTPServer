@@ -30,7 +30,7 @@ public abstract class AbstractBufferedConnection extends AbstractConnection {
 	public void readData() throws IOException {
 		if(readBuffer.remaining() == 0) throw new IOException("Read buffer overflow");
 		if(getSocket().read(readBuffer) == -1) {
-			close();
+			shutdownRead();
 			return;
 		}
 
@@ -53,7 +53,7 @@ public abstract class AbstractBufferedConnection extends AbstractConnection {
 		}
 
 		if(getSocket().write(writeBuffer) == -1) {
-			close();
+			shutdownWrite();
 			return;
 		}
 	}

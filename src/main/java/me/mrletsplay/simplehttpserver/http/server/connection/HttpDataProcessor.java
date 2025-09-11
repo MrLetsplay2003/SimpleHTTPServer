@@ -48,6 +48,8 @@ public class HttpDataProcessor {
 
 	private RequestAndResponse currentResponse;
 
+	private boolean close;
+
 	public HttpDataProcessor(HttpConnection connection) {
 		this.connection = connection;
 		this.responseQueue = new LinkedBlockingQueue<>();
@@ -80,25 +82,29 @@ public class HttpDataProcessor {
 	}
 
 	public void writeData(ByteBuffer buffer) throws IOException {
-		boolean currentResponseDone = currentResponse == null || (currentResponse.buffer.remaining() == 0 && currentResponse.done);
+		if(currentResponse != null) {
+			synchronized (currentResponse) {
+				if(!currentResponse.buffer.hasRemaining() && currentResponse.done) {
+					currentResponse.stopProcessing();
+					currentResponse = null; // EOF detected
+				}
+			}
+		}
 
-		if(currentResponseDone && responseQueue.isEmpty()) {
-			if(connection.getWebsocketConnection() != null) {
-				connection.getWebsocketConnection().writeData(buffer);
+		if(currentResponse == null) {
+			if(close) {
+				connection.close();
+				return;
 			}
 
-			return;
-		}else if(currentResponseDone) {
-			if(currentResponse != null) {
-				currentResponse.stopProcessing();
-				boolean close = "close".equals(currentResponse.request.getFields().getFirst("Connection"));
-				// FIXME: send response header
-				currentResponse = null;
-
-				if(close) {
-					close();
-					return;
+			if(responseQueue.isEmpty()) {
+				if(connection.getWebsocketConnection() != null) {
+					connection.getWebsocketConnection().writeData(buffer);
+				} else if (connection.isReadShutdown()) {
+					connection.close();
 				}
+
+				return;
 			}
 
 			if(responseQueue.peek().response == null) {
@@ -111,8 +117,10 @@ public class HttpDataProcessor {
 			currentResponse = requestAndResponse;
 		}
 
+		// Write response data
 		synchronized (currentResponse) {
-			BufferUtil.copyAvailable(currentResponse.buffer.read(), buffer);
+			int copied = BufferUtil.copyAvailable(currentResponse.buffer.read(), buffer);
+			connection.getLogger().trace("Transferred " + copied + " bytes");
 
 			if(!currentResponse.done) {
 				if(currentResponse.buffer.remaining() < currentResponse.buffer.capacity() / 2) {
@@ -123,8 +131,16 @@ public class HttpDataProcessor {
 					// Wait for new data to be processed
 					connection.stopWriting();
 				}
+			} else {
+				currentResponse.stopProcessing();
+				close = "close".equals(currentResponse.request.getFields().getFirst("Connection"));
+				// FIXME: send response header
 			}
 		}
+	}
+
+	public boolean isIdle() {
+		return currentResponse == null && responseQueue.isEmpty();
 	}
 
 	private boolean process(HttpRequestContext context, RequestProcessor process) {
@@ -180,6 +196,7 @@ public class HttpDataProcessor {
 		}
 
 		requestAndResponse.response = sh;
+		requestAndResponse.startProcessing();
 		connection.getLogger().debug(String.format("Finished processing request: %s %s %s", request.getMethod(), request.getPath(), request.getProtocolVersion()));
 		connection.startWriting();
 	}
@@ -343,7 +360,7 @@ public class HttpDataProcessor {
 
 	private class RequestAndResponse {
 
-		private static final int BUFFER_SIZE = 64 * 1024; // TODO: Magic value
+		private static final int BUFFER_SIZE = 512 * 1024; // TODO: Magic value
 		private static final int CONTENT_BUFFER_SIZE = 1024; // TODO: Magic value
 
 		private HttpClientHeader request;
@@ -389,6 +406,7 @@ public class HttpDataProcessor {
 							processingFuture = null;
 							contentInputStream.close();
 							connection.getLogger().trace("Processing stopped: EOF");
+							connection.startWriting();
 							return;
 						}
 

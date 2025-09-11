@@ -48,6 +48,15 @@ public class HttpConnectionImpl extends AbstractBufferedConnection implements Ht
 		dataProcessor.writeData(buffer);
 	}
 
+	@Override
+	public void shutdownRead() {
+		super.shutdownRead();
+
+		if(dataProcessor.isIdle()) {
+			close();
+		}
+	}
+
 //	@Override
 //	public void readData() throws IOException {
 //		if(websocketConnection != null) {

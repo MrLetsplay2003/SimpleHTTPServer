@@ -2,6 +2,7 @@ package me.mrletsplay.simplehttpserver.http.document;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -13,7 +14,7 @@ public class DocumentMap {
 	private Map<String, DocumentMapEntry> documents;
 
 	public DocumentMap() {
-		this.documents = new HashMap<>();
+		this.documents = new LinkedHashMap<>();
 	}
 
 	public void put(HttpRequestMethod method, String path, HttpDocument document) {

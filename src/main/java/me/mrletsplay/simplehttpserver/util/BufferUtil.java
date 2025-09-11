@@ -12,13 +12,14 @@ public class BufferUtil {
 	 * @param dst Destination buffer
 	 * @throws IllegalArgumentException If a buffer is not backed by an array
 	 */
-	public static void copyAvailable(ByteBuffer src, ByteBuffer dst) throws IllegalArgumentException {
+	public static int copyAvailable(ByteBuffer src, ByteBuffer dst) throws IllegalArgumentException {
 		if(!src.hasArray() || !dst.hasArray()) throw new IllegalArgumentException("Both buffers must be backed by an array");
 
 		int toCopy = Math.min(src.remaining(), dst.remaining());
 		System.arraycopy(src.array(), src.position() + src.arrayOffset(), dst.array(), dst.position() + dst.arrayOffset(), toCopy);
 		src.position(src.position() + toCopy);
 		dst.position(dst.position() + toCopy);
+		return toCopy;
 	}
 
 	/**

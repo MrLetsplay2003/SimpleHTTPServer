@@ -105,7 +105,7 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 
 		if(peerNetData.remaining() == 0) throw new IOException("Buffer is full");
 		if(getSocket().read(peerNetData.write()) == -1) {
-			close();
+			shutdownRead();
 			return;
 		}
 
@@ -150,7 +150,7 @@ public class HttpsConnectionImpl extends AbstractConnection implements HttpConne
 
 		getLogger().trace(String.format("Can write up to %s bytes", myNetData.remaining()));
 		if(getSocket().write(myNetData.read()) == -1) {
-			close();
+			shutdownWrite();
 			return;
 		}
 	}
