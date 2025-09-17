@@ -160,10 +160,10 @@ public class HttpDataProcessor {
 		HttpRequestContext ctx = new HttpRequestContext(connection, request, sh);
 		HttpRequestContext.setCurrentContext(ctx);
 
-		HttpDocument d = connection.getServer().getDocumentProvider().get(request.getMethod(), request.getPath().getDocumentPath());
-		if(d == null) d = connection.getServer().getDocumentProvider().getNotFoundDocument();
-
 		try {
+			HttpDocument d = connection.getServer().getDocumentProvider().get(request.getMethod(), request.getPath().getDocumentPath());
+			if(d == null) d = connection.getServer().getDocumentProvider().getNotFoundDocument();
+
 			boolean cont = true;
 
 			RequestProcessor preProcessor = connection.getServer().getRequestPreProcessor();
